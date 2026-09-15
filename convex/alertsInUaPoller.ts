@@ -108,10 +108,12 @@ function parseActiveWesternOblasts(data: AlertData, westernOblasts: string[]): s
 				// Check if alert is active - various possible structures
 				const isActive =
 					oblastData === true ||
-					oblastData.active === true ||
-					oblastData.alert === true ||
-					oblastData.status === 'active' ||
-					oblastData.type === 'air_raid' ||
+					(typeof oblastData === 'object' &&
+						oblastData !== null &&
+						(('active' in oblastData && oblastData.active === true) ||
+							('alert' in oblastData && oblastData.alert === true) ||
+							('status' in oblastData && oblastData.status === 'active') ||
+							('type' in oblastData && oblastData.type === 'air_raid'))) ||
 					(Array.isArray(oblastData) && oblastData.length > 0);
 
 				if (isActive) {
@@ -124,8 +126,14 @@ function parseActiveWesternOblasts(data: AlertData, westernOblasts: string[]): s
 	// Format 2: Array of alert objects
 	if (Array.isArray(data)) {
 		for (const alert of data) {
-			if (alert.oblast || alert.region || alert.name) {
-				const oblastName = (alert.oblast || alert.region || alert.name).toLowerCase();
+			if (
+				typeof alert === 'object' &&
+				alert !== null &&
+				('oblast' in alert || 'region' in alert || 'name' in alert)
+			) {
+				const oblastName = String(
+					'oblast' in alert ? alert.oblast : 'region' in alert ? alert.region : alert.name
+				).toLowerCase();
 
 				// Check if this is one of our western oblasts
 				for (const oblast of westernOblasts) {
