@@ -27,9 +27,10 @@ export const getStatus = query({
 		const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 		const rcbAirActive = recentRcbAir && recentRcbAir.published_at > twoHoursAgo;
 
-		// Placeholder for UA raid status (will be implemented with alerts.in.ua integration)
-		const uaWestRaidActive = false;
-		const uaOblasts: string[] = [];
+		// Get current UA raid state
+		const uaRaidState = await ctx.db.query('ua_raid_state').first();
+		const uaWestRaidActive = uaRaidState ? uaRaidState.active_oblasts.length > 0 : false;
+		const uaOblasts = uaRaidState?.active_oblasts || [];
 
 		return {
 			as_of: new Date().toISOString(),
@@ -58,38 +59,74 @@ export const getEvents = query({
 	handler: async (ctx, args) => {
 		const limit = args.limit || 20;
 
-		let eventsQuery = ctx.db.query('events');
+		const eventsQuery = ctx.db.query('events');
 
 		// Apply type filter if provided
 		if (args.type) {
-			eventsQuery = eventsQuery.withIndex('by_type', (q) => q.eq('type', args.type as any));
+			const typedQuery = eventsQuery.withIndex('by_type', (q) =>
+				q.eq(
+					'type',
+					args.type as
+						| 'rcb_air'
+						| 'rcb_other'
+						| 'dorsz_ops'
+						| 'dorsz_violation'
+						| 'ua_raid_west'
+						| 'notam_zone'
+						| 'incident'
+						| 'news'
+						| 'osint'
+				)
+			);
+			const events = await typedQuery.order('desc').take(limit * 2); // Get extra for filtering
+
+			// Filter by since date if provided
+			let filteredEvents = args.since
+				? events.filter((e) => e.published_at >= args.since!)
+				: events;
+
+			// Take only requested limit
+			filteredEvents = filteredEvents.slice(0, limit);
+
+			return filteredEvents.map((event) => ({
+				_id: event._id,
+				type: event.type,
+				title: event.title,
+				body: event.body,
+				published_at: event.published_at,
+				source_name: event.source_name,
+				source_url: event.source_url,
+				confidence: event.confidence,
+				polish_airspace_violation: event.polish_airspace_violation,
+				location: event.location,
+				ua_oblasts: event.ua_oblasts
+			}));
 		} else {
-			eventsQuery = eventsQuery.withIndex('by_published_at');
+			const indexedQuery = eventsQuery.withIndex('by_published_at');
+			const events = await indexedQuery.order('desc').take(limit * 2);
+
+			// Filter by since date if provided
+			let filteredEvents = args.since
+				? events.filter((e) => e.published_at >= args.since!)
+				: events;
+
+			// Take only requested limit
+			filteredEvents = filteredEvents.slice(0, limit);
+
+			return filteredEvents.map((event) => ({
+				_id: event._id,
+				type: event.type,
+				title: event.title,
+				body: event.body,
+				published_at: event.published_at,
+				source_name: event.source_name,
+				source_url: event.source_url,
+				confidence: event.confidence,
+				polish_airspace_violation: event.polish_airspace_violation,
+				location: event.location,
+				ua_oblasts: event.ua_oblasts
+			}));
 		}
-
-		let events = await eventsQuery.order('desc').take(limit * 2); // Get extra for filtering
-
-		// Filter by since date if provided
-		if (args.since) {
-			events = events.filter((e) => e.published_at >= args.since!);
-		}
-
-		// Take only requested limit
-		events = events.slice(0, limit);
-
-		return events.map((event) => ({
-			_id: event._id,
-			type: event.type,
-			title: event.title,
-			body: event.body,
-			published_at: event.published_at,
-			source_name: event.source_name,
-			source_url: event.source_url,
-			confidence: event.confidence,
-			polish_airspace_violation: event.polish_airspace_violation,
-			location: event.location,
-			ua_oblasts: event.ua_oblasts
-		}));
 	}
 });
 
@@ -103,10 +140,10 @@ export const getEvent = query({
 		if (!event) return null;
 
 		// Get related events if any
-		let relatedEvents = [];
+		const relatedEvents: unknown[] = [];
 		if (event.related_event_ids && event.related_event_ids.length > 0) {
 			const related = await Promise.all(event.related_event_ids.map((id) => ctx.db.get(id)));
-			relatedEvents = related.filter(Boolean);
+			relatedEvents.push(...related.filter(Boolean));
 		}
 
 		return {
@@ -134,7 +171,15 @@ export const getHealth = query({
 					};
 					return acc;
 				},
-				{} as Record<string, any>
+				{} as Record<
+					string,
+					{
+						status: 'ok' | 'error';
+						last_successful_fetch: string;
+						last_attempt: string;
+						error_message?: string;
+					}
+				>
 			)
 		};
 	}

@@ -38,7 +38,18 @@ A SvelteKit + Convex application that aggregates official air situation alerts (
 npm install
 ```
 
-2. Set up Convex:
+2. Set up environment variables (optional):
+
+Create a `.env.local` file in the project root:
+
+```bash
+# Optional: alerts.in.ua API token for western Ukraine raid correlation
+# Request token at https://alerts.in.ua/
+# If not set, app will run but UA correlator data will show as unavailable
+ALERTS_IN_UA_TOKEN=your_token_here
+```
+
+3. Set up Convex:
 
 ```bash
 # Initialize Convex project (first time only)
@@ -155,9 +166,17 @@ Returns array of event objects.
   - Stores with source URL and confidence: official
   - Falls back to fixture if parsing fails
 
+- **alerts.in.ua** - Western Ukraine raid correlation - Polled every 25 seconds via Convex cron
+  - Tracks western oblasts: Volyn, Lviv, Rivne, Zakarpattia (configurable)
+  - Emits `ua_raid_west` event only on edge detection (inactive → active transition)
+  - Respects soft rate limit (~2.4 req/min)
+  - Requires `ALERTS_IN_UA_TOKEN` environment variable
+  - If token not set, app runs gracefully with null freshness for alerts_in_ua
+  - **Never** displayed as "Poland under attack" - secondary correlator only
+
 ### Planned (Not in MVP)
 
-- alerts.in.ua - Western Ukraine raid status
+- **alerts.in.ua** - Western Ukraine raid status
 - News RSS - TVN24, PAP (classified as confidence: single_outlet)
 - DORSZ social - Manual curation or X API
 
@@ -230,6 +249,9 @@ The server will listen on:
 
 - `PORT` - Server port (optional, default: 3000)
 - `HOST` - Server host (optional, default: 0.0.0.0)
+- `ALERTS_IN_UA_TOKEN` - Token for alerts.in.ua API (optional, enables western Ukraine raid correlation)
+
+**Note on ALERTS_IN_UA_TOKEN**: If not set, the application will run normally but the western Ukraine correlator will show as unavailable. Request a token at [https://alerts.in.ua/](https://alerts.in.ua/) to enable this feature.
 
 **Dokploy/Nixpacks**: Add `VITE_CONVEX_URL` to "Build Environment Variables" in app settings, not just runtime environment.
 

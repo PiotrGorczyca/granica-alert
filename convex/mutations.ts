@@ -98,3 +98,64 @@ export const updateSourceStatus = mutation({
 		}
 	}
 });
+
+// Update UA raid state and detect edges (inactive → active)
+// Returns true if edge was detected and event was created
+export const updateUaRaidState = mutation({
+	args: {
+		active_oblasts: v.array(v.string())
+	},
+	handler: async (ctx, args) => {
+		const now = new Date().toISOString();
+
+		// Get current state (singleton table)
+		const currentState = await ctx.db.query('ua_raid_state').first();
+
+		const previousActive = currentState?.active_oblasts || [];
+		const nowActive = args.active_oblasts;
+
+		// Detect edge: was inactive (empty), now active (non-empty)
+		const wasInactive = previousActive.length === 0;
+		const nowActiveTransition = nowActive.length > 0;
+		const edgeDetected = wasInactive && nowActiveTransition;
+
+		// Update or create state
+		if (currentState) {
+			await ctx.db.patch(currentState._id, {
+				active_oblasts: nowActive,
+				updated_at: now,
+				previous_active: previousActive
+			});
+		} else {
+			await ctx.db.insert('ua_raid_state', {
+				active_oblasts: nowActive,
+				updated_at: now,
+				previous_active: []
+			});
+		}
+
+		// Create event only on edge: inactive → active
+		if (edgeDetected) {
+			console.log(`UA raid edge detected! Active oblasts: ${nowActive.join(', ')}`);
+
+			await ctx.db.insert('events', {
+				type: 'ua_raid_west',
+				title: `Alert powietrzny w zachodniej Ukrainie: ${nowActive.join(', ')}`,
+				body: `Aktywne alarmy w obwodach: ${nowActive.map(capitalizeFirst).join(', ')}. Może to skutkować operowaniem polskiego i sojuszniczego lotnictwa w polskiej przestrzeni powietrznej.`,
+				published_at: now,
+				ingested_at: now,
+				source_name: 'alerts.in.ua',
+				source_url: 'https://alerts.in.ua/',
+				confidence: 'official',
+				polish_airspace_violation: 'not_applicable',
+				ua_oblasts: nowActive
+			});
+		}
+
+		return edgeDetected;
+	}
+});
+
+function capitalizeFirst(str: string): string {
+	return str.charAt(0).toUpperCase() + str.slice(1);
+}
