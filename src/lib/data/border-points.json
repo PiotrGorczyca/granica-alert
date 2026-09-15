@@ -1,0 +1,89 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Dorohusk–Yahodyn",
+        "description": "Przejście graniczne Polska-Ukraina",
+        "type": "border_crossing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.9167, 51.2833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Korytnica",
+        "description": "Przejście graniczne Polska-Ukraina",
+        "type": "border_crossing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.6833, 50.9667]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Medyka–Szeginie",
+        "description": "Przejście graniczne Polska-Ukraina",
+        "type": "border_crossing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [22.9333, 49.8]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hrebenne",
+        "description": "Przejście graniczne Polska-Ukraina",
+        "type": "border_crossing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.8167, 50.5]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Terespol–Brześć",
+        "description": "Przejście graniczne Polska-Białoruś",
+        "type": "border_crossing"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.6167, 52.0833]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Korytarz Suwalski",
+        "description": "Strategiczny korytarz graniczny między Polską a Litwą",
+        "type": "context_area"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [23.1, 54.2]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Obwód Kaliningrad",
+        "description": "Rosyjski eksklawa przy granicy z Polską",
+        "type": "context_area"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [20.5, 54.7]
+      }
+    }
+  ]
+}

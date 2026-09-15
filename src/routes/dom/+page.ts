@@ -1,0 +1,9 @@
+import type { PageLoad } from './$types';
+
+export const load: PageLoad = async ({ parent }) => {
+	const parentData = await parent();
+	return {
+		status: parentData.status || null,
+		events: parentData.events || []
+	};
+};
