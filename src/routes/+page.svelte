@@ -162,6 +162,42 @@
 			</div>
 		</section>
 
+		<!-- Western Ukraine Correlator (small, secondary) -->
+		{#if data.status}
+			<section class="mb-6">
+				<div class="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<span class="font-medium text-gray-700">Zachodnia Ukraina:</span>
+							{#if data.status.ua_west_raid_active}
+								<span class="text-gray-900">
+									Aktywne alarmy ({data.status.ua_oblasts.join(', ')})
+								</span>
+							{:else}
+								<span class="text-gray-600">Brak aktywnych alarmów</span>
+							{/if}
+						</div>
+						{#if data.status.ua_west_raid_active}
+							<span class="rounded-full bg-yellow-100 px-2 py-0.5 text-xs text-yellow-800">
+								Alarm UA
+							</span>
+						{/if}
+					</div>
+					{#if data.status.sources_freshness.alerts_in_ua}
+						<div class="mt-1 text-xs text-gray-500">
+							Źródło: alerts.in.ua · ostatnia aktualizacja {formatTime(
+								data.status.sources_freshness.alerts_in_ua
+							)}
+						</div>
+					{:else if data.status.sources_freshness.alerts_in_ua === null}
+						<div class="mt-1 text-xs text-gray-500">
+							alerts.in.ua: brak danych (token nie skonfigurowany)
+						</div>
+					{/if}
+				</div>
+			</section>
+		{/if}
+
 		<!-- Recent Events -->
 		<section class="mb-6">
 			<h2 class="mb-3 text-lg font-semibold text-gray-900">Ostatnie wydarzenia</h2>
@@ -257,7 +293,7 @@
 				<span class="text-gray-400">·</span>
 				<a href="/settings" class="hover:text-gray-900 hover:underline">Ustawienia</a>
 			</div>
-			<p class="text-xs text-gray-500">Dane ze źródeł: RCB (gov.pl)</p>
+			<p class="text-xs text-gray-500">Dane ze źródeł: RCB (gov.pl), alerts.in.ua</p>
 		</footer>
 	</main>
 </div>

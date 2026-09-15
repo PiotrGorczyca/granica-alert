@@ -72,5 +72,13 @@ export default defineSchema({
 		last_attempt: v.string(),
 		status: v.union(v.literal('ok'), v.literal('error')),
 		error_message: v.optional(v.string())
-	}).index('by_source', ['source_name'])
+	}).index('by_source', ['source_name']),
+
+	// Track UA western raid state for edge detection
+	ua_raid_state: defineTable({
+		// Singleton table - always has one row with known ID
+		active_oblasts: v.array(v.string()),
+		updated_at: v.string(),
+		previous_active: v.optional(v.array(v.string()))
+	})
 });
