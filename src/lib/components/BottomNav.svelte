@@ -13,12 +13,12 @@
 	}
 </script>
 
-<nav class="fixed bottom-0 left-0 right-0 border-t border-border bg-surface">
+<nav class="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-surface">
 	<div class="mx-auto flex max-w-4xl">
 		{#each routes as route}
 			<a
 				href={route.path}
-				class="flex flex-1 flex-col items-center gap-1 px-3 py-2 transition-colors {isActive(
+				class="flex flex-1 flex-col items-center gap-1 px-3 py-3 transition-colors {isActive(
 					route.path
 				)
 					? 'text-calm'
