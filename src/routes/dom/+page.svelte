@@ -70,18 +70,18 @@
 </script>
 
 <svelte:head>
-	<title>Lista wydarzeń - Granica Alert</title>
+	<title>Dom - Granica Alert</title>
 	<meta
 		name="description"
-		content="Pełna lista wydarzeń i komunikatów RCB dla wschodniej Polski"
+		content="Status i pełna lista wydarzeń dla wschodniej Polski"
 	/>
 </svelte:head>
 
 <div class="min-h-screen bg-bg">
 	<header class="border-b border-border bg-surface">
 		<div class="mx-auto max-w-4xl px-4 py-4">
-			<h1 class="text-2xl font-bold text-ink">Lista wydarzeń</h1>
-			<p class="mt-1 text-sm text-ink-muted">Pełna lista komunikatów i wydarzeń</p>
+			<h1 class="text-2xl font-bold text-ink">Dom</h1>
+			<p class="mt-1 text-sm text-ink-muted">Status i lista wydarzeń</p>
 		</div>
 	</header>
 

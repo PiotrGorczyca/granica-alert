@@ -1,85 +1,121 @@
 <script lang="ts">
 	import InteractiveMap from '$lib/components/InteractiveMap.svelte';
 	import CompactStatusStrip from '$lib/components/CompactStatusStrip.svelte';
-	import EventFeedPanel from '$lib/components/EventFeedPanel.svelte';
 	import MapLayerToggles from '$lib/components/MapLayerToggles.svelte';
+	import MapSidebar from '$lib/components/MapSidebar.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 	
-	let showFeed = $state(false);
 	let activeLayers = $state({
 		epR134: true,
 		borderPoints: true,
 		events: true
 	});
 
-	function toggleFeed() {
-		showFeed = !showFeed;
-	}
+	let selectedEvent: typeof data.events[0] | null = $state(null);
+	let sidebarCollapsed = $state(false);
 </script>
 
 <svelte:head>
-	<title>Granica Alert - Świadomość sytuacyjna wschodniej Polski</title>
+	<title>Mapa - Granica Alert</title>
 	<meta
 		name="description"
 		content="Interaktywna mapa i aktualna sytuacja powietrzna dla wschodniej Polski"
 	/>
 </svelte:head>
 
-<div class="relative h-[calc(100vh-4rem)] w-full overflow-hidden bg-bg">
-	<!-- Full-bleed Map -->
-	<div class="absolute inset-0">
-		<InteractiveMap events={data.events} activeLayers={activeLayers} />
+<!-- Mobile layout -->
+<div class="flex h-[calc(100vh-4rem)] flex-col lg:hidden">
+	<!-- Compact status strip above map -->
+	<div class="flex-shrink-0 border-b border-border bg-surface p-2">
+		<CompactStatusStrip status={data.status} />
 	</div>
 
-	<!-- Overlay Layer -->
-	<div class="pointer-events-none absolute inset-0">
-		<!-- Compact Status Strip (Top) -->
-		<div class="pointer-events-auto absolute left-4 right-4 top-4 md:left-6 md:right-auto md:max-w-md">
-			<CompactStatusStrip status={data.status} />
+	<!-- Map with floating layer toggle -->
+	<div class="relative flex-1">
+		<InteractiveMap 
+			events={data.events} 
+			activeLayers={activeLayers}
+			onEventClick={(event) => selectedEvent = event}
+		/>
+		
+		<!-- Layer toggle (top-right) -->
+		<div class="pointer-events-none absolute inset-0">
+			<div class="pointer-events-auto absolute right-2 top-2">
+				<MapLayerToggles bind:activeLayers />
+			</div>
 		</div>
+	</div>
+</div>
 
-		<!-- Layer Toggles (Top Right) -->
-		<div class="pointer-events-auto absolute right-4 top-4 md:right-6">
-			<MapLayerToggles bind:activeLayers />
-		</div>
-
-		<!-- Feed Toggle Button (Desktop: right side, Mobile: bottom) -->
-		<div class="pointer-events-auto absolute bottom-6 right-4 md:right-6 md:top-24">
-			<button
-				onclick={toggleFeed}
-				class="flex items-center gap-2 rounded-lg border border-border bg-surface px-4 py-3 shadow-lg transition-all hover:shadow-xl"
-				aria-label={showFeed ? 'Ukryj wydarzenia' : 'Pokaż wydarzenia'}
-			>
-				<svg class="h-5 w-5 text-ink" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 6h16M4 12h16M4 18h16"
-					/>
-				</svg>
-				<span class="hidden text-sm font-medium text-ink md:inline">Wydarzenia</span>
-				{#if data.events.length > 0}
-					<span class="flex h-5 w-5 items-center justify-center rounded-full bg-attention text-xs font-bold text-surface">
-						{data.events.length}
+<!-- Desktop layout -->
+<div class="hidden h-[calc(100vh-4rem)] lg:flex lg:flex-col">
+	<!-- Top status bar (full width) -->
+	<div class="flex-shrink-0 border-b border-border bg-surface px-6 py-3">
+		<div class="flex items-center justify-between">
+			<div class="flex items-center gap-3">
+				<div
+					class="h-3 w-3 rounded-full {data.status?.rcb_air_active ? 'bg-attention' : 'bg-calm'}"
+				></div>
+				<div>
+					<span class="font-semibold text-ink {data.status?.rcb_air_active ? 'text-attention' : 'text-calm'}">
+						{#if data.status?.rcb_air_active}
+							Alert RCB aktywny
+						{:else}
+							Spokojnie
+						{/if}
+					</span>
+					<span class="mx-2 text-ink-muted">·</span>
+					<span class="text-sm text-ink-muted">
+						{#if data.status?.rcb_air_active}
+							Lotnictwo RP operuje
+						{:else}
+							Brak aktywnego alertu RCB powietrznego
+						{/if}
+					</span>
+				</div>
+			</div>
+			<div class="flex items-center gap-4">
+				{#if data.status}
+					<span class="text-xs text-ink-muted">
+						Aktualizacja: {new Intl.DateTimeFormat('pl-PL', {
+							hour: '2-digit',
+							minute: '2-digit'
+						}).format(new Date(data.status.as_of))}
 					</span>
 				{/if}
-			</button>
+				<a
+					href="https://www.gov.pl/web/rcb/komunikaty"
+					target="_blank"
+					rel="noopener noreferrer"
+					class="text-sm text-info hover:underline"
+				>
+					RCB ↗
+				</a>
+			</div>
+		</div>
+	</div>
+
+	<!-- Main content: sidebar + map -->
+	<div class="flex flex-1 overflow-hidden">
+		<!-- Left sidebar -->
+		<div class="{sidebarCollapsed ? 'w-12' : 'w-64'} flex-shrink-0 border-r border-border bg-surface transition-all">
+			<MapSidebar 
+				bind:activeLayers
+				selectedEvent={selectedEvent}
+				collapsed={sidebarCollapsed}
+				onToggleCollapse={() => sidebarCollapsed = !sidebarCollapsed}
+			/>
 		</div>
 
-		<!-- Event Feed Panel (Sliding from right on desktop, bottom sheet on mobile) -->
-		{#if showFeed}
-			<div
-				class="pointer-events-auto absolute inset-x-0 bottom-0 max-h-[60vh] overflow-hidden rounded-t-2xl border-t border-border bg-surface shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:w-96 md:max-h-none md:rounded-none md:rounded-l-2xl md:border-l md:border-t-0"
-			>
-				<EventFeedPanel 
-					events={data.events} 
-					status={data.status}
-					onClose={toggleFeed}
-				/>
-			</div>
-		{/if}
+		<!-- Map (fills remaining space) -->
+		<div class="relative flex-1">
+			<InteractiveMap 
+				events={data.events} 
+				activeLayers={activeLayers}
+				onEventClick={(event) => selectedEvent = event}
+			/>
+		</div>
 	</div>
 </div>

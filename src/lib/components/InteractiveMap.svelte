@@ -13,7 +13,8 @@
 			epR134: true,
 			borderPoints: true,
 			events: true
-		}
+		},
+		onEventClick = () => {}
 	}: {
 		events?: PageData['events'];
 		activeLayers?: {
@@ -21,6 +22,7 @@
 			borderPoints: boolean;
 			events: boolean;
 		};
+		onEventClick?: (event: PageData['events'][0]) => void;
 	} = $props();
 
 	let mapContainer: HTMLDivElement;
@@ -228,6 +230,13 @@
 				if (e.features && e.features.length > 0) {
 					const feature = e.features[0];
 					const props = feature.properties;
+					const eventId = props.id;
+					
+					// Find the full event object
+					const clickedEvent = events[eventId];
+					if (clickedEvent) {
+						onEventClick(clickedEvent);
+					}
 					
 					const eventTypeLabels: Record<string, string> = {
 						rcb_air: 'RCB powietrzny',
@@ -244,7 +253,7 @@
 						yes: 'Tak',
 						no: 'Nie',
 						unknown: 'Nieznane',
-						not_applicable: 'N/A'
+						not_applicable: 'Nie dotyczy'
 					};
 
 					function getTimeSince(isoString: string) {
@@ -260,7 +269,7 @@
 					const typeLabel = eventTypeLabels[props.type] || props.type;
 					const timeSince = getTimeSince(props.published_at);
 					const violationText = props.polish_airspace_violation !== 'not_applicable' 
-						? `<br><small>Naruszenie RP: ${violationLabels[props.polish_airspace_violation]}</small>`
+						? `<br><small style="color: #5C6675;">Naruszenie RP: ${violationLabels[props.polish_airspace_violation]}</small>`
 						: '';
 
 					new maplibregl.Popup()
@@ -270,10 +279,11 @@
 								<div style="font-size: 11px; color: #5C6675; margin-bottom: 4px;">
 									${typeLabel} · ${timeSince}
 								</div>
-								<strong style="font-size: 13px;">${props.title}</strong>
+								<strong style="font-size: 13px; color: #1C2430;">${props.title}</strong>
 								${violationText}
-								<div style="margin-top: 8px; font-size: 11px;">
-									<a href="${props.source_url}" target="_blank" rel="noopener" style="color: #3A5F7A;">Źródło ↗</a>
+								<div style="margin-top: 8px; font-size: 11px; display: flex; gap: 12px;">
+									<a href="${props.source_url}" target="_blank" rel="noopener" style="color: #3A5F7A; text-decoration: none;">Źródło ↗</a>
+									<a href="/dom" style="color: #3A5F7A; text-decoration: none;">Szczegóły →</a>
 								</div>
 							</div>
 						`)

@@ -20,9 +20,9 @@
 	}
 
 	const layers = [
-		{ key: 'epR134' as const, label: 'EP R134', icon: '🟨' },
-		{ key: 'borderPoints' as const, label: 'Punkty', icon: '📍' },
-		{ key: 'events' as const, label: 'Wydarzenia', icon: '⚡' }
+		{ key: 'epR134' as const, label: 'Strefa EP R134', icon: '🟨' },
+		{ key: 'events' as const, label: 'Wydarzenia', icon: '⚡' },
+		{ key: 'borderPoints' as const, label: 'Granica / kontekst', icon: '📍' }
 	];
 </script>
 
@@ -53,6 +53,11 @@
 						<span class="text-ink">{layer.label}</span>
 					</label>
 				{/each}
+			</div>
+			<div class="mt-3 border-t border-border pt-2">
+				<p class="text-xs text-ink-muted">
+					Tylko kontekst oficjalnych komunikatów — bez śledzenia wojsk.
+				</p>
 			</div>
 		</div>
 	{:else}
