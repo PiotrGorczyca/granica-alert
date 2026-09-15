@@ -80,5 +80,15 @@ export default defineSchema({
 		active_oblasts: v.array(v.string()),
 		updated_at: v.string(),
 		previous_active: v.optional(v.array(v.string()))
-	})
+	}),
+
+	// Track news RSS items we've seen to avoid duplicates
+	news_items: defineTable({
+		external_id: v.string(), // guid or URL hash
+		source_key: v.string(), // e.g. "tvn24_najnowsze"
+		url: v.string(),
+		fetched_at: v.string(),
+		content_hash: v.string(),
+		event_id: v.optional(v.id('events'))
+	}).index('by_external_id', ['source_key', 'external_id'])
 });

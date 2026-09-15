@@ -27,5 +27,9 @@ test-results
 
 # Convex
 .env.local
+.convex
 # Note: convex/_generated/ is intentionally NOT ignored
 # We commit generated types for production builds
+# Ignore any .js/.js.map files in convex/ (they're built from .ts)
+convex/*.js
+convex/*.js.map

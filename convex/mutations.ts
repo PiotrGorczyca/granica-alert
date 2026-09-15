@@ -159,3 +159,58 @@ export const updateUaRaidState = mutation({
 function capitalizeFirst(str: string): string {
 	return str.charAt(0).toUpperCase() + str.slice(1);
 }
+
+export const storeNewsItem = mutation({
+	args: {
+		newsItem: v.object({
+			external_id: v.string(),
+			title: v.string(),
+			url: v.string(),
+			summary: v.optional(v.string()),
+			published_at: v.string(),
+			source_key: v.string(),
+			source_name: v.string(),
+			matched_keywords: v.array(v.string())
+		})
+	},
+	handler: async (ctx, args) => {
+		const { newsItem } = args;
+
+		const existing = await ctx.db
+			.query('news_items')
+			.withIndex('by_external_id', (q) =>
+				q.eq('source_key', newsItem.source_key).eq('external_id', newsItem.external_id)
+			)
+			.first();
+
+		if (existing) {
+			return false;
+		}
+
+		const contentHash = await simpleHash(newsItem.title + newsItem.url);
+
+		const eventId = await ctx.db.insert('events', {
+			type: 'news',
+			title: newsItem.title,
+			body: newsItem.summary,
+			published_at: newsItem.published_at,
+			ingested_at: new Date().toISOString(),
+			source_name: newsItem.source_name,
+			source_url: newsItem.url,
+			confidence: 'single_outlet',
+			polish_airspace_violation: 'not_applicable',
+			raw_content_hash: contentHash
+		});
+
+		await ctx.db.insert('news_items', {
+			external_id: newsItem.external_id,
+			source_key: newsItem.source_key,
+			url: newsItem.url,
+			fetched_at: new Date().toISOString(),
+			content_hash: contentHash,
+			event_id: eventId
+		});
+
+		return true;
+	}
+});

@@ -11,6 +11,7 @@
 import type * as alertsInUaPoller from "../alertsInUaPoller.js";
 import type * as crons from "../crons.js";
 import type * as mutations from "../mutations.js";
+import type * as newsRssPoller from "../newsRssPoller.js";
 import type * as queries from "../queries.js";
 import type * as rcbPoller from "../rcbPoller.js";
 
@@ -24,6 +25,7 @@ declare const fullApi: ApiFromModules<{
   alertsInUaPoller: typeof alertsInUaPoller;
   crons: typeof crons;
   mutations: typeof mutations;
+  newsRssPoller: typeof newsRssPoller;
   queries: typeof queries;
   rcbPoller: typeof rcbPoller;
 }>;

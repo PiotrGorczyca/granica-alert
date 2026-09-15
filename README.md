@@ -174,11 +174,21 @@ Returns array of event objects.
   - If token not set, app runs gracefully with null freshness for alerts_in_ua
   - **Never** displayed as "Poland under attack" - secondary correlator only
 
+- **News RSS** - Keyword-filtered Polish media - Polled every 10 minutes via Convex cron
+  - Sources: TVN24, RMF24, Defence24, Polsat News, Gazeta.pl, Radio Rzeszów
+  - Keyword filter: eastern border / air / RCB / DORSZ / drone / military aviation terms
+  - Stored as `type: news`, `confidence: single_outlet`
+  - **Never** auto-upgrades to official or changes Home status strip
+  - UI displays clear "Wiadomość medialna" badge with "Nieoficjalne — sprawdź źródło" warning
+  - Deduplicates by URL/guid per source
+  - Polite User-Agent; resilient parsing; skips failed feeds without crashing
+  - Full-text **not** republished (copyright + calm design) — summary + source link only
+
 ### Planned (Not in MVP)
 
-- **alerts.in.ua** - Western Ukraine raid status
-- News RSS - TVN24, PAP (classified as confidence: single_outlet)
 - DORSZ social - Manual curation or X API
+- Google Alerts RSS for long-tail news
+- Admin paste for official DORSZ/MON posts
 
 ## Development
 

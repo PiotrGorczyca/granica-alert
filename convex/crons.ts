@@ -13,4 +13,7 @@ crons.interval(
 	api.alertsInUaPoller.pollAlertsInUa
 );
 
+// Poll news RSS feeds every 10 minutes (balanced between freshness and politeness)
+crons.interval('poll news rss feeds', { minutes: 10 }, api.newsRssPoller.pollNewsRss);
+
 export default crons;
