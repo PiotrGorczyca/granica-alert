@@ -59,15 +59,31 @@ export const getEvents = query({
 	handler: async (ctx, args) => {
 		const limit = args.limit || 20;
 
-		let eventsQuery = ctx.db.query('events');
+		const eventsQuery = ctx.db.query('events');
 
 		// Apply type filter if provided
 		if (args.type) {
-			const typedQuery = eventsQuery.withIndex('by_type', (q) => q.eq('type', args.type as any));
+			const typedQuery = eventsQuery.withIndex('by_type', (q) =>
+				q.eq(
+					'type',
+					args.type as
+						| 'rcb_air'
+						| 'rcb_other'
+						| 'dorsz_ops'
+						| 'dorsz_violation'
+						| 'ua_raid_west'
+						| 'notam_zone'
+						| 'incident'
+						| 'news'
+						| 'osint'
+				)
+			);
 			const events = await typedQuery.order('desc').take(limit * 2); // Get extra for filtering
 
 			// Filter by since date if provided
-			let filteredEvents = args.since ? events.filter((e) => e.published_at >= args.since!) : events;
+			let filteredEvents = args.since
+				? events.filter((e) => e.published_at >= args.since!)
+				: events;
 
 			// Take only requested limit
 			filteredEvents = filteredEvents.slice(0, limit);
@@ -90,7 +106,9 @@ export const getEvents = query({
 			const events = await indexedQuery.order('desc').take(limit * 2);
 
 			// Filter by since date if provided
-			let filteredEvents = args.since ? events.filter((e) => e.published_at >= args.since!) : events;
+			let filteredEvents = args.since
+				? events.filter((e) => e.published_at >= args.since!)
+				: events;
 
 			// Take only requested limit
 			filteredEvents = filteredEvents.slice(0, limit);
@@ -122,10 +140,10 @@ export const getEvent = query({
 		if (!event) return null;
 
 		// Get related events if any
-		let relatedEvents: any[] = [];
+		const relatedEvents: unknown[] = [];
 		if (event.related_event_ids && event.related_event_ids.length > 0) {
 			const related = await Promise.all(event.related_event_ids.map((id) => ctx.db.get(id)));
-			relatedEvents = related.filter(Boolean);
+			relatedEvents.push(...related.filter(Boolean));
 		}
 
 		return {
@@ -153,7 +171,15 @@ export const getHealth = query({
 					};
 					return acc;
 				},
-				{} as Record<string, any>
+				{} as Record<
+					string,
+					{
+						status: 'ok' | 'error';
+						last_successful_fetch: string;
+						last_attempt: string;
+						error_message?: string;
+					}
+				>
 			)
 		};
 	}

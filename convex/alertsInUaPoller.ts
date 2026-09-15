@@ -2,7 +2,7 @@ import { action } from './_generated/server';
 import { api } from './_generated/api';
 
 interface AlertData {
-	[key: string]: any;
+	[key: string]: unknown;
 }
 
 interface PollResult {
@@ -101,7 +101,8 @@ function parseActiveWesternOblasts(data: AlertData, westernOblasts: string[]): s
 	if (typeof data === 'object' && !Array.isArray(data)) {
 		for (const oblast of westernOblasts) {
 			// Try various common field names
-			const oblastData = data[oblast] || data[oblast.toLowerCase()] || data[capitalizeFirst(oblast)];
+			const oblastData =
+				data[oblast] || data[oblast.toLowerCase()] || data[capitalizeFirst(oblast)];
 
 			if (oblastData) {
 				// Check if alert is active - various possible structures
