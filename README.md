@@ -179,11 +179,23 @@ npm run test:e2e
 
 ## Deployment
 
+### Requirements
+
+- **Node.js**: 20 or 22 (specified in `nixpacks.toml` and `package.json`)
+- **Convex**: Production deployment must be completed first
+- **Build Environment**: `VITE_CONVEX_URL` must be available at build time
+
 ### Production Build
 
-Build the SvelteKit application for production:
+⚠️ **Critical**: Set `VITE_CONVEX_URL` as a **build environment variable** before building.
+
+SvelteKit/Vite bakes `import.meta.env.VITE_*` variables into the bundle at build time.
 
 ```bash
+# Set build environment
+export VITE_CONVEX_URL=https://your-deployment.convex.cloud
+
+# Build
 npm run build
 ```
 
@@ -210,11 +222,16 @@ The server will listen on:
 
 ### Production Environment Variables
 
-Set these in your hosting platform (Vercel, Cloudflare, Dokploy, etc.):
+**Build-time** (required during `npm run build`):
 
-- `VITE_CONVEX_URL` - Your production Convex deployment URL (required)
+- `VITE_CONVEX_URL` - Your production Convex deployment URL (required, must be set as build env)
+
+**Runtime** (optional, set when starting server):
+
 - `PORT` - Server port (optional, default: 3000)
 - `HOST` - Server host (optional, default: 0.0.0.0)
+
+**Dokploy/Nixpacks**: Add `VITE_CONVEX_URL` to "Build Environment Variables" in app settings, not just runtime environment.
 
 ### Convex Production Deployment
 
@@ -224,7 +241,18 @@ Deploy Convex functions to production:
 npx convex deploy --prod
 ```
 
-This outputs your production `VITE_CONVEX_URL` - add it to your hosting platform's environment variables.
+This outputs your production `VITE_CONVEX_URL` - add it to your hosting platform's **build environment variables**.
+
+### Nixpacks Configuration
+
+The repo includes `nixpacks.toml` for Dokploy/Railway deployments:
+
+- **Node.js**: Pinned to version 22
+- **Package manager**: npm with `npm ci` for reproducible installs
+- **Build**: `npm run build`
+- **Start**: `npm start`
+
+If Node.js 18.x error occurs, ensure your platform uses the `nixpacks.toml` configuration or manually set Node.js ≥20.
 
 ### Testing Production Build Locally
 

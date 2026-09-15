@@ -4,22 +4,49 @@
 
 ### 1. Environment Variables
 
-Set in your hosting platform:
+⚠️ **CRITICAL**: `VITE_CONVEX_URL` must be set as a **BUILD environment variable** in Dokploy.
+
+SvelteKit/Vite bakes environment variables into the bundle at **build time**, not runtime.
+
+Set in your hosting platform as **build** environment variables:
 
 ```env
 VITE_CONVEX_URL=https://your-deployment.convex.cloud
+```
+
+Runtime environment variables (optional):
+
+```env
 PORT=3000
 HOST=0.0.0.0
 ```
 
-### 2. Build & Start Commands
+### 2. Node.js Version
 
-Dokploy/Nixpacks should auto-detect:
+This project requires **Node.js 20 or 22**. The repo includes `nixpacks.toml` that pins Node.js 22:
 
-- **Build**: `npm install && npm run build`
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_22", "bun"]
+```
+
+If using a different platform, ensure Node.js ≥20 via `package.json`:
+
+```json
+"engines": {
+  "node": ">=20"
+}
+```
+
+### 3. Build & Start Commands
+
+Dokploy/Nixpacks auto-detects via `nixpacks.toml`:
+
+- **Install**: `npm ci`
+- **Build**: `npm run build`
 - **Start**: `npm start` (runs `node build/index.js`)
 
-### 3. Convex Production Deployment
+### 4. Convex Production Deployment
 
 Before deploying the app, deploy Convex functions:
 
@@ -27,17 +54,18 @@ Before deploying the app, deploy Convex functions:
 # Deploy to production (first time)
 npx convex deploy --prod
 
-# This will output your CONVEX_URL
-# Add it to your hosting platform as VITE_CONVEX_URL
+# This will output your CONVEX_URL (e.g., https://cvx-granica-alert.demopg.page)
+# Add it to your hosting platform as VITE_CONVEX_URL (build environment variable!)
 ```
 
 ## Deployment Checklist
 
 - [ ] Deploy Convex functions: `npx convex deploy --prod`
 - [ ] Copy production `VITE_CONVEX_URL` from Convex output
-- [ ] Set `VITE_CONVEX_URL` in hosting platform environment variables
-- [ ] Set `PORT` (optional, default: 3000)
-- [ ] Set `HOST` (optional, default: 0.0.0.0)
+- [ ] **Set `VITE_CONVEX_URL` as BUILD environment variable in Dokploy** (critical!)
+- [ ] Verify Node.js 20+ in hosting platform (nixpacks.toml pins nodejs_22)
+- [ ] Set `PORT` (optional runtime env, default: 3000)
+- [ ] Set `HOST` (optional runtime env, default: 0.0.0.0)
 - [ ] Deploy SvelteKit app (build + start)
 - [ ] Verify RCB poller cron is running (check Convex dashboard)
 - [ ] Test API endpoints:
@@ -65,11 +93,17 @@ Copy the deployment URL.
 
 ### Step 2: Configure Environment
 
-Create `.env.production` or set in hosting dashboard:
+⚠️ **Important**: For Dokploy/Vite builds, `VITE_CONVEX_URL` must be set as a **build environment variable**, not just runtime.
+
+**Dokploy**: Add to "Build Environment Variables" section in app settings.
+
+**Local .env.production** (for local testing):
 
 ```env
 VITE_CONVEX_URL=https://xxxxx.convex.cloud
 ```
+
+**Why build-time?** SvelteKit/Vite bundles `import.meta.env.VITE_*` variables into the JavaScript at build time. Runtime environment variables won't work for client-side code.
 
 ### Step 3: Build SvelteKit
 
@@ -122,6 +156,36 @@ curl https://your-domain.com/v1/events?limit=10
 - [ ] Footer links work (/sources, /map, /settings)
 
 ## Troubleshooting
+
+### "Node.js 18.x has reached End-Of-Life and has been removed"
+
+**Problem**: Nixpacks is trying to use deprecated Node.js 18.
+
+**Solution**: Ensure `nixpacks.toml` exists in repo root (it does):
+
+```toml
+[phases.setup]
+nixPkgs = ["nodejs_22", "bun"]
+```
+
+If the error persists:
+
+1. Verify `nixpacks.toml` is committed and pushed
+2. Check Dokploy/hosting platform detects the file
+3. Manually force Node.js 22 in platform settings if available
+4. Verify `package.json` has `"engines": {"node": ">=20"}`
+
+### "VITE_CONVEX_URL is undefined" or blank page
+
+**Problem**: Environment variable not available at build time.
+
+**Solution**: Set `VITE_CONVEX_URL` as a **BUILD environment variable** in Dokploy:
+
+1. Go to app settings → Build Environment Variables (not Runtime Environment)
+2. Add: `VITE_CONVEX_URL=https://your-deployment.convex.cloud`
+3. Rebuild the application
+
+Vite/SvelteKit bundles these variables at build time, not runtime.
 
 ### "Cannot find module '../convex/_generated/api'"
 
