@@ -5,19 +5,18 @@
 	<title>Mapa - Granica Alert</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-50">
-	<header class="border-b border-gray-200 bg-white">
+<div class="min-h-screen bg-bg">
+	<header class="border-b border-border bg-surface">
 		<div class="mx-auto max-w-4xl px-4 py-4">
-			<a href="/" class="mb-2 inline-block text-sm text-blue-600 hover:text-blue-800">← Powrót</a>
-			<h1 class="text-2xl font-bold text-gray-900">Mapa kontekstu</h1>
+			<h1 class="text-2xl font-bold text-ink">Mapa kontekstu</h1>
 		</div>
 	</header>
 
 	<main class="mx-auto max-w-4xl px-4 py-6">
-		<div class="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-6">
+		<div class="mb-6 rounded-lg border border-info bg-info-bg p-6">
 			<div class="flex gap-3">
 				<svg
-					class="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600"
+					class="mt-0.5 h-5 w-5 flex-shrink-0 text-info"
 					fill="currentColor"
 					viewBox="0 0 20 20"
 				>
@@ -27,9 +26,9 @@
 						clip-rule="evenodd"
 					/>
 				</svg>
-				<div class="text-sm text-blue-900">
+				<div class="text-sm text-ink">
 					<p class="mb-1 font-semibold">Mapa w przygotowaniu</p>
-					<p>
+					<p class="text-ink-muted">
 						Interaktywna mapa z oznaczeniem stref NOTAM (np. EP R134), punktów kontekstowych i
 						lokalizacji potwierdzonych incydentów pojawi się w następnej wersji.
 					</p>
@@ -37,12 +36,12 @@
 			</div>
 		</div>
 
-		<div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-			<h2 class="mb-3 text-lg font-semibold text-gray-900">Planowane elementy mapy</h2>
+		<div class="rounded-lg border border-border bg-surface p-6 shadow-sm">
+			<h2 class="mb-3 text-lg font-semibold text-ink">Planowane elementy mapy</h2>
 
-			<div class="space-y-4 text-sm text-gray-700">
+			<div class="space-y-4 text-sm text-ink-muted">
 				<div>
-					<h3 class="font-medium text-gray-900">Warstwy statyczne</h3>
+					<h3 class="font-medium text-ink">Warstwy statyczne</h3>
 					<ul class="mt-2 ml-4 list-inside list-disc space-y-1">
 						<li>Strefa EP R134 (przestrzeń zastrzeżona przy granicy wschodniej)</li>
 						<li>Punkty kontekstowe: Dorohusk, Korytnica, przejścia graniczne</li>
@@ -52,7 +51,7 @@
 				</div>
 
 				<div>
-					<h3 class="font-medium text-gray-900">Pinezki incydentów</h3>
+					<h3 class="font-medium text-ink">Pinezki incydentów</h3>
 					<ul class="mt-2 ml-4 list-inside list-disc space-y-1">
 						<li>Potwierdzone lokalizacje incydentów (np. Tarnawa 2026-07)</li>
 						<li>Tylko wydarzenia zweryfikowane oficjalnie</li>
@@ -61,7 +60,7 @@
 				</div>
 
 				<div>
-					<h3 class="font-medium text-gray-900">Opcjonalne</h3>
+					<h3 class="font-medium text-ink">Opcjonalne</h3>
 					<ul class="mt-2 ml-4 list-inside list-disc space-y-1">
 						<li>Ruch lotniczy cywilny (OpenSky / ADS-B) - tylko dla kontekstu</li>
 						<li>Domyślnie wyłączone</li>
@@ -71,10 +70,11 @@
 			</div>
 		</div>
 
-		<div class="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-6">
-			<p class="text-sm text-yellow-900">
-				<strong>Przypomnienie:</strong> Mapa nie będzie pokazywać pozycji dronów bojowych, rakiet ani
-				tajnych misji wojskowych. To narzędzie kontekstu geograficznego dla oficjalnych komunikatów.
+		<div class="mt-6 rounded-lg border border-attention bg-attention-bg p-6">
+			<p class="text-sm text-ink-muted">
+				<strong class="text-ink">Przypomnienie:</strong> Mapa nie będzie pokazywać pozycji dronów bojowych,
+				rakiet ani tajnych misji wojskowych. To narzędzie kontekstu geograficznego dla oficjalnych
+				komunikatów.
 			</p>
 		</div>
 	</main>
