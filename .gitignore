@@ -27,4 +27,5 @@ test-results
 
 # Convex
 .env.local
-convex/_generated/
+# Note: convex/_generated/ is intentionally NOT ignored
+# We commit generated types for production builds

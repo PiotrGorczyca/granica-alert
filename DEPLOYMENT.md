@@ -187,11 +187,23 @@ If the error persists:
 
 Vite/SvelteKit bundles these variables at build time, not runtime.
 
-### "Cannot find module '../convex/_generated/api'"
+### "Cannot find module '../convex/_generated/api'" or UNRESOLVED_IMPORT
 
-This is expected during `npm run check` before deploying Convex. The types are generated when you run `npx convex dev` or `npx convex deploy`.
+**Problem**: Build cannot find Convex generated types.
 
-**Solution**: Deploy Convex first with `npx convex deploy --prod`
+**Solution**: This should not happen - `convex/_generated/` is committed to the repo. If it occurs:
+
+1. Verify `convex/_generated/` exists and contains `api.js`, `api.d.ts`, `server.js`, `server.d.ts`
+2. Check `.gitignore` does NOT have `convex/_generated/` (it should be committed)
+3. If files are missing, run locally:
+   ```bash
+   npx convex dev
+   git add convex/_generated/
+   git commit -m "chore: Add Convex generated files"
+   git push
+   ```
+
+The generated files are checked into version control specifically to allow production builds without Convex authentication.
 
 ### "No start command could be found"
 

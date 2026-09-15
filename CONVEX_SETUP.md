@@ -1,8 +1,14 @@
 # Convex Setup Instructions
 
+## Important: Generated Files Committed
+
+This project commits `convex/_generated/` to the repository for production builds. This allows builds to succeed without requiring Convex authentication during CI/CD or Dokploy deployments.
+
+If you modify the Convex schema or functions, you must regenerate and commit the updated files (see "Daily Development" below).
+
 ## First-Time Setup
 
-Before running the application, you must initialize Convex to generate the required type definitions and client code.
+Before running the application, you must initialize Convex to connect to a deployment.
 
 ### Step 1: Install dependencies
 
@@ -23,11 +29,13 @@ This will:
 1. Prompt you to log in or create a Convex account
 2. Create a new Convex project (or let you select an existing one)
 3. Generate `.env.local` with your `CONVEX_DEPLOYMENT` and `VITE_CONVEX_URL`
-4. Generate TypeScript client code in `convex/_generated/`
+4. Regenerate TypeScript client code in `convex/_generated/` (already committed but will be refreshed)
 5. Deploy your schema and functions
 6. Start the cron job for RCB polling
 
 **Important**: Keep this terminal running - Convex needs to watch for changes.
+
+**Note**: The `convex/_generated/` directory is committed to the repo, so you can build the app without running `npx convex dev` first. However, you need it to actually deploy Convex functions and get a working backend.
 
 ### Step 3: Start SvelteKit
 
@@ -54,6 +62,19 @@ npx convex dev
 ```bash
 npm run dev
 ```
+
+## When Schema or Functions Change
+
+If you modify `convex/schema.ts` or add/remove/modify Convex functions:
+
+1. Convex dev will automatically regenerate `convex/_generated/`
+2. **Commit the changes** to `convex/_generated/`:
+   ```bash
+   git add convex/_generated/
+   git commit -m "chore: Update Convex generated files"
+   ```
+
+This ensures production builds have the latest types.
 
 ## Manual Polling
 
