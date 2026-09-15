@@ -179,26 +179,61 @@ npm run test:e2e
 
 ## Deployment
 
-### SvelteKit
+### Production Build
 
-Build and deploy to your preferred host (Vercel, Cloudflare Pages, etc.):
+Build the SvelteKit application for production:
 
 ```bash
 npm run build
-npm run preview  # Test production build locally
 ```
 
-### Convex
+This creates a production-ready Node.js server in the `build/` directory using `@sveltejs/adapter-node`.
 
-Convex functions are automatically deployed when you push to production:
+### Running in Production
+
+Start the production server:
+
+```bash
+npm start
+```
+
+Or directly:
+
+```bash
+node build/index.js
+```
+
+The server will listen on:
+
+- **Port**: `PORT` environment variable (default: 3000)
+- **Host**: `HOST` environment variable (default: 0.0.0.0)
+
+### Production Environment Variables
+
+Set these in your hosting platform (Vercel, Cloudflare, Dokploy, etc.):
+
+- `VITE_CONVEX_URL` - Your production Convex deployment URL (required)
+- `PORT` - Server port (optional, default: 3000)
+- `HOST` - Server host (optional, default: 0.0.0.0)
+
+### Convex Production Deployment
+
+Deploy Convex functions to production:
 
 ```bash
 npx convex deploy --prod
 ```
 
-Update your production environment variables:
+This outputs your production `VITE_CONVEX_URL` - add it to your hosting platform's environment variables.
 
-- `VITE_CONVEX_URL` - Your production Convex deployment URL
+### Testing Production Build Locally
+
+```bash
+npm run build
+npm start
+```
+
+Then visit `http://localhost:3000`
 
 ## Roadmap
 

@@ -1,6 +1,15 @@
 import { mutation } from './_generated/server';
 import { v } from 'convex/values';
-import crypto from 'crypto';
+
+// Simple hash function for content deduplication (Web Crypto compatible)
+async function simpleHash(text: string): Promise<string> {
+	const encoder = new TextEncoder();
+	const data = encoder.encode(text);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+	return hashHex.substring(0, 16);
+}
 
 // Store RCB komunikat as event if new
 export const storeRcbKomunikat = mutation({
@@ -27,12 +36,8 @@ export const storeRcbKomunikat = mutation({
 			return false; // Already stored
 		}
 
-		// Create content hash
-		const contentHash = crypto
-			.createHash('sha256')
-			.update(komunikat.title + komunikat.url)
-			.digest('hex')
-			.substring(0, 16);
+		// Create content hash using Web Crypto
+		const contentHash = await simpleHash(komunikat.title + komunikat.url);
 
 		// Store event
 		const eventId = await ctx.db.insert('events', {
