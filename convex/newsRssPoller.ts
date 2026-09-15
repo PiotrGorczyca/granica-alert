@@ -228,8 +228,7 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'rcb',
 		'dorsz',
 		'dowództwo operacyjne',
-		'przestrzeni powietrznej',
-		'przestrzeń powietrzna',
+		'przestrzen',
 		'naruszeni',
 		'ep r',
 		'ep-r',
@@ -238,9 +237,10 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'bezpilot',
 		'dron',
 		'nalot',
-		'alarm powietrzny',
+		'alarm powietrz',
 		'operowanie lotnictwa',
 		'straż graniczna',
+		'graniczn',
 		'dorohusk',
 		'przemyśl',
 		'rzeszów',
@@ -255,7 +255,8 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'radar',
 		'awacs',
 		'f-16',
-		'atak.*ukrain',
+		'atak',
+		'ukrain',
 		'białoru'
 	];
 
