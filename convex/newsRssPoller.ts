@@ -221,14 +221,26 @@ function decodeHtml(text: string): string {
 }
 
 function filterByKeywords(title: string, summary: string): string[] {
+	const titleLower = title.toLowerCase();
 	const text = `${title} ${summary}`.toLowerCase();
 	const matched: string[] = [];
 
-	const strongKeywords = [
+	// Test cases (inline documentation):
+	// ACCEPT: "RCB: Nalot na Ukrainę, polskie lotnictwo operuje" (rcb + air theme)
+	// ACCEPT: "DORSZ potwierdza naruszenie przestrzeni powietrznej" (dorsz + violation)
+	// ACCEPT: "Drony Shahed nad Lublinem" (drone + air threat)
+	// ACCEPT: "F-16 przechwyciły obiekt nad Podkarpaciem" (f-16 + action)
+	// REJECT: "Atak wilka w Samoklęskach" (atak alone, no air/border context)
+	// REJECT: "Pożar trawy w Rzeszowie" (city alone, no air/border/military)
+	// REJECT: "Muzeum Franciszkanów zaprasza" (culture, no keywords)
+	// REJECT: "Wodór jako energia przyszłości" (energy, no threat)
+
+	// Core official/threat keywords (strong alone)
+	const coreStrongKeywords = [
 		'rcb',
 		'dorsz',
 		'dowództwo operacyjne',
-		'przestrzen',
+		'przestrzen powietrz', // airspace (combined to be more specific)
 		'naruszeni',
 		'ep r',
 		'ep-r',
@@ -240,7 +252,14 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'alarm powietrz',
 		'operowanie lotnictwa',
 		'straż graniczna',
-		'graniczn',
+		'radar',
+		'awacs',
+		'f-16'
+	];
+
+	// Context keywords (demoted to weak - need pairing)
+	const weakKeywords = [
+		// Geographic (demoted from strong - too broad alone)
 		'dorohusk',
 		'przemyśl',
 		'rzeszów',
@@ -252,15 +271,13 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'podla',
 		'rusinowo',
 		'wielka księża',
-		'radar',
-		'awacs',
-		'f-16',
+		// Border/boundary (demoted - need air/military context)
+		'graniczn',
+		// Conflict terms (demoted - too broad without context)
 		'atak',
 		'ukrain',
-		'białoru'
-	];
-
-	const weakKeywords = [
+		'białoru',
+		// Military/aviation
 		'rakiet',
 		'pocisk',
 		'awaria',
@@ -277,39 +294,78 @@ function filterByKeywords(title: string, summary: string): string[] {
 		'pirotechnik'
 	];
 
+	// Suppress: local non-threat, culture, weather, sports, entertainment
 	const suppressKeywords = [
 		'piłk',
 		'ekstraklasa',
 		'celebrity',
 		'horoskop',
 		'promocj',
-		'black friday'
+		'black friday',
+		// Add culture/museum/local events
+		'muze',
+		'wystaw',
+		'koncert',
+		'festiwal',
+		'spektakl',
+		'teatr',
+		// Weather/fire/local incidents (without air context)
+		'pożar trawy',
+		'pali się trawa',
+		'palenie traw',
+		// Wildlife
+		'wilk',
+		'wilki',
+		'niedźwied',
+		'dzik',
+		// Local infrastructure (without aviation)
+		'remont drogi',
+		'utrudnien drogowe',
+		// Energy/tech (non-military)
+		'wodór',
+		'energia słoneczna',
+		'fotowoltaik'
 	];
 
+	// First check suppress list
 	for (const suppress of suppressKeywords) {
 		if (text.includes(suppress)) {
 			return [];
 		}
 	}
 
-	let strongCount = 0;
+	let coreStrongCount = 0;
 	let weakCount = 0;
 
-	for (const keyword of strongKeywords) {
+	// Prioritize title (weight title matches more)
+	// Check core strong keywords
+	for (const keyword of coreStrongKeywords) {
 		if (text.includes(keyword)) {
 			matched.push(keyword);
-			strongCount++;
+			// Title match counts double
+			if (titleLower.includes(keyword)) {
+				coreStrongCount += 2;
+			} else {
+				coreStrongCount += 1;
+			}
 		}
 	}
 
+	// Check weak keywords
 	for (const keyword of weakKeywords) {
 		if (text.includes(keyword)) {
 			matched.push(keyword);
-			weakCount++;
+			// Title match counts as 1.5
+			if (titleLower.includes(keyword)) {
+				weakCount += 1.5;
+			} else {
+				weakCount += 1;
+			}
 		}
 	}
 
-	if (strongCount >= 1 || weakCount >= 2) {
+	// Pass criteria: ≥1 core strong (weighted) OR ≥2 weak (weighted)
+	if (coreStrongCount >= 1 || weakCount >= 2) {
 		return matched;
 	}
 

@@ -19,7 +19,7 @@
 		ua_raid_west: 'UA nalot',
 		notam_zone: 'NOTAM',
 		incident: 'Incydent',
-		news: 'Wiadomości',
+		news: 'Wiadomość medialna',
 		osint: 'OSINT'
 	};
 

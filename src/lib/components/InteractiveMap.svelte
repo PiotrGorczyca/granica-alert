@@ -245,7 +245,7 @@
 						dorsz_violation: 'DORSZ naruszenie',
 						ua_raid_west: 'UA nalot',
 						incident: 'Incydent',
-						news: 'Wiadomości',
+						news: 'Wiadomość medialna',
 						osint: 'OSINT'
 					};
 
