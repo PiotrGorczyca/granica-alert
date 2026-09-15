@@ -21,5 +21,11 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
 # Playwright
 test-results
+
+# Convex
+.env.local
+# Note: convex/_generated/ is intentionally NOT ignored
+# We commit generated types for production builds
