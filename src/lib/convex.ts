@@ -10,4 +10,4 @@ export const convex = new ConvexHttpClient(convexUrl);
 
 // Re-export api for convenience
 // Generated files are committed to repo for production builds
-export { api } from '../convex/_generated/api.js';
+export { api } from '../../convex/_generated/api.js';
