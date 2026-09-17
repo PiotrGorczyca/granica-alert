@@ -1,350 +1,361 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as maplibregl from 'maplibre-gl';
-	import type { MapMouseEvent } from 'maplibre-gl';
+	import type { GeoJSONSource, MapLayerMouseEvent } from 'maplibre-gl';
+	import type { Feature, FeatureCollection } from 'geojson';
 	import 'maplibre-gl/dist/maplibre-gl.css';
-	import epR134 from '$lib/data/ep-r134.json';
+	import wojewodztwa from '$lib/data/wojewodztwa.json';
+	import uaOblasts from '$lib/data/ua-oblasts.json';
 	import borderPoints from '$lib/data/border-points.json';
-	import type { PageData } from '../../routes/$types';
+	import { MAP_COLORS, EASTERN_POLAND_BOUNDS } from '$lib/data/map-theme';
+	import type { AlertAreas, ActiveOblast, MapLayers } from '$lib/types';
 
-	let { 
-		events = [],
-		activeLayers = {
-			epR134: true,
-			borderPoints: true,
-			events: true
-		},
-		onEventClick = () => {}
+	let {
+		areas = null,
+		oblasts = [],
+		activeLayers = { alertAreas: true, uaOblasts: true, borderPoints: true },
+		focusArea = null
 	}: {
-		events?: PageData['events'];
-		activeLayers?: {
-			epR134: boolean;
-			borderPoints: boolean;
-			events: boolean;
-		};
-		onEventClick?: (event: PageData['events'][0]) => void;
+		/** Areas under a current official alert. Null means nothing is in force. */
+		areas?: AlertAreas | null;
+		oblasts?: ActiveOblast[];
+		activeLayers?: MapLayers;
+		/** The user's own voivodeship, to centre on. */
+		focusArea?: string | null;
 	} = $props();
 
 	let mapContainer: HTMLDivElement;
-	let map: maplibregl.Map;
+	let map: maplibregl.Map | undefined;
+	let ready = $state(false);
+	/** Powiat geometry is 359 KB, so it is only fetched when something needs it. */
+	let powiatData: FeatureCollection | null = $state(null);
 
-	function eventsToGeoJSON(events: PageData['events']) {
-		return {
-			type: 'FeatureCollection',
-			features: events
-				.filter(e => e.type !== 'notam_zone')
-				.map((event, idx) => ({
-					type: 'Feature',
-					properties: {
-						id: idx,
-						title: event.title,
-						type: event.type,
-						published_at: event.published_at,
-						source_url: event.source_url,
-						source_name: event.source_name,
-						polish_airspace_violation: event.polish_airspace_violation || 'not_applicable'
-					},
-					geometry: {
-						type: 'Point',
-						coordinates: [23.7 + Math.random() * 0.6, 50.8 + Math.random() * 0.8]
-					}
-				}))
-		};
-	}
+	const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 	onMount(() => {
-		map = new maplibregl.Map({
+		const instance = new maplibregl.Map({
 			container: mapContainer,
 			style: {
 				version: 8,
 				sources: {
-					'osm-tiles': {
+					osm: {
 						type: 'raster',
 						tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
 						tileSize: 256,
+						maxzoom: 19,
 						attribution:
-							'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+							'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · granice: GUGiK PRG, geoBoundaries (ODbL)'
 					}
 				},
-				layers: [
-					{
-						id: 'osm-tiles',
-						type: 'raster',
-						source: 'osm-tiles',
-						minzoom: 0,
-						maxzoom: 19
-					}
-				]
+				layers: [{ id: 'osm', type: 'raster', source: 'osm' }]
 			},
-			center: [23.5, 51.0],
-			zoom: 7
+			bounds: EASTERN_POLAND_BOUNDS,
+			fitBoundsOptions: { padding: 24 },
+			// Nothing useful lies outside this frame for a border resident.
+			maxBounds: [
+				[13.0, 46.5],
+				[32.0, 57.0]
+			],
+			minZoom: 4,
+			attributionControl: { compact: true }
 		});
 
-		map.addControl(new maplibregl.NavigationControl(), 'top-right');
-		map.addControl(new maplibregl.ScaleControl(), 'bottom-left');
+		map = instance;
+		instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+		instance.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
-		map.on('load', () => {
-			map.addSource('ep-r134', {
-				type: 'geojson',
-				data: epR134 as any
-			});
+		instance.on('load', () => {
+			addLayers(instance);
+			addBorderMarkers(instance);
+			ready = true;
 
-			map.addLayer({
-				id: 'ep-r134-fill',
-				type: 'fill',
-				source: 'ep-r134',
-				paint: {
-					'fill-color': '#B86A1C',
-					'fill-opacity': 0.2
-				},
-				layout: {
-					visibility: activeLayers.epR134 ? 'visible' : 'none'
-				}
-			});
-
-			map.addLayer({
-				id: 'ep-r134-outline',
-				type: 'line',
-				source: 'ep-r134',
-				paint: {
-					'line-color': '#B86A1C',
-					'line-width': 2,
-					'line-dasharray': [2, 2]
-				},
-				layout: {
-					visibility: activeLayers.epR134 ? 'visible' : 'none'
-				}
-			});
-
-			map.addSource('border-points', {
-				type: 'geojson',
-				data: borderPoints as any
-			});
-
-			map.addLayer({
-				id: 'border-points',
-				type: 'circle',
-				source: 'border-points',
-				paint: {
-					'circle-radius': 8,
-					'circle-color': [
-						'match',
-						['get', 'type'],
-						'border_crossing',
-						'#3A5F7A',
-						'context_area',
-						'#5C6675',
-						'#3A5F7A'
-					],
-					'circle-stroke-width': 2,
-					'circle-stroke-color': '#ffffff'
-				},
-				layout: {
-					visibility: activeLayers.borderPoints ? 'visible' : 'none'
-				}
-			});
-
-			map.addLayer({
-				id: 'border-points-labels',
-				type: 'symbol',
-				source: 'border-points',
-				layout: {
-					'text-field': ['get', 'name'],
-					'text-font': ['Open Sans Regular'],
-					'text-offset': [0, 1.5],
-					'text-anchor': 'top',
-					'text-size': 12,
-					visibility: activeLayers.borderPoints ? 'visible' : 'none'
-				},
-				paint: {
-					'text-color': '#1C2430',
-					'text-halo-color': '#ffffff',
-					'text-halo-width': 2
-				}
-			});
-
-			// Add event pins
-			const eventData = eventsToGeoJSON(events);
-			map.addSource('event-pins', {
-				type: 'geojson',
-				data: eventData as any
-			});
-
-			map.addLayer({
-				id: 'event-pins',
-				type: 'circle',
-				source: 'event-pins',
-				paint: {
-					'circle-radius': 6,
-					'circle-color': [
-						'match',
-						['get', 'type'],
-						'rcb_air',
-						'#B86A1C',
-						'dorsz_violation',
-						'#A9483D',
-						'incident',
-						'#A9483D',
-						'#3A5F7A'
-					],
-					'circle-stroke-width': 2,
-					'circle-stroke-color': '#ffffff'
-				},
-				layout: {
-					visibility: activeLayers.events ? 'visible' : 'none'
-				}
-			});
-
-			map.on('click', 'border-points', (e: any) => {
-				if (e.features && e.features.length > 0) {
-					const feature = e.features[0];
-					const coordinates = (feature.geometry as any).coordinates.slice();
-					const { name, description } = feature.properties as {
-						name: string;
-						description: string;
-					};
-
-					new maplibregl.Popup()
-						.setLngLat([coordinates[0], coordinates[1]])
-						.setHTML(`<strong>${name}</strong><br>${description}`)
-						.addTo(map);
-				}
-			});
-
-			map.on('click', 'ep-r134-fill', (e: any) => {
-				if (e.features && e.features.length > 0) {
-					const feature = e.features[0];
-					const { name, description } = feature.properties as {
-						name: string;
-						description: string;
-					};
-
-					new maplibregl.Popup()
-						.setLngLat(e.lngLat)
-						.setHTML(`<strong>${name}</strong><br>${description}`)
-						.addTo(map);
-				}
-			});
-
-			map.on('click', 'event-pins', (e: any) => {
-				if (e.features && e.features.length > 0) {
-					const feature = e.features[0];
-					const props = feature.properties;
-					const eventId = props.id;
-					
-					// Find the full event object
-					const clickedEvent = events[eventId];
-					if (clickedEvent) {
-						onEventClick(clickedEvent);
-					}
-					
-					const eventTypeLabels: Record<string, string> = {
-						rcb_air: 'RCB powietrzny',
-						rcb_other: 'RCB',
-						dorsz_ops: 'DORSZ',
-						dorsz_violation: 'DORSZ naruszenie',
-						ua_raid_west: 'UA nalot',
-						incident: 'Incydent',
-						news: 'Wiadomość medialna',
-						osint: 'OSINT'
-					};
-
-					const violationLabels: Record<string, string> = {
-						yes: 'Tak',
-						no: 'Nie',
-						unknown: 'Nieznane',
-						not_applicable: 'Nie dotyczy'
-					};
-
-					function getTimeSince(isoString: string) {
-						const now = Date.now();
-						const then = new Date(isoString).getTime();
-						const diffMinutes = Math.floor((now - then) / 60000);
-						if (diffMinutes < 60) return `${diffMinutes} min temu`;
-						const diffHours = Math.floor(diffMinutes / 60);
-						if (diffHours < 24) return `${diffHours}h temu`;
-						return `${Math.floor(diffHours / 24)} dni temu`;
-					}
-
-					const typeLabel = eventTypeLabels[props.type] || props.type;
-					const timeSince = getTimeSince(props.published_at);
-					const violationText = props.polish_airspace_violation !== 'not_applicable' 
-						? `<br><small style="color: #5C6675;">Naruszenie RP: ${violationLabels[props.polish_airspace_violation]}</small>`
-						: '';
-
-					new maplibregl.Popup()
-						.setLngLat(e.lngLat)
-						.setHTML(`
-							<div style="min-width: 200px;">
-								<div style="font-size: 11px; color: #5C6675; margin-bottom: 4px;">
-									${typeLabel} · ${timeSince}
-								</div>
-								<strong style="font-size: 13px; color: #1C2430;">${props.title}</strong>
-								${violationText}
-								<div style="margin-top: 8px; font-size: 11px; display: flex; gap: 12px;">
-									<a href="${props.source_url}" target="_blank" rel="noopener" style="color: #3A5F7A; text-decoration: none;">Źródło ↗</a>
-									<a href="/dom" style="color: #3A5F7A; text-decoration: none;">Szczegóły →</a>
-								</div>
-							</div>
-						`)
-						.addTo(map);
-				}
-			});
-
-			map.on('mouseenter', 'border-points', () => {
-				map.getCanvas().style.cursor = 'pointer';
-			});
-
-			map.on('mouseleave', 'border-points', () => {
-				map.getCanvas().style.cursor = '';
-			});
-
-			map.on('mouseenter', 'ep-r134-fill', () => {
-				map.getCanvas().style.cursor = 'pointer';
-			});
-
-			map.on('mouseleave', 'ep-r134-fill', () => {
-				map.getCanvas().style.cursor = '';
-			});
-
-			map.on('mouseenter', 'event-pins', () => {
-				map.getCanvas().style.cursor = 'pointer';
-			});
-
-			map.on('mouseleave', 'event-pins', () => {
-				map.getCanvas().style.cursor = '';
-			});
-		});
-
-		// Watch for layer visibility changes
-		$effect(() => {
-			if (map && map.isStyleLoaded()) {
-				if (map.getLayer('ep-r134-fill')) {
-					map.setLayoutProperty('ep-r134-fill', 'visibility', activeLayers.epR134 ? 'visible' : 'none');
-					map.setLayoutProperty('ep-r134-outline', 'visibility', activeLayers.epR134 ? 'visible' : 'none');
-				}
-				if (map.getLayer('border-points')) {
-					map.setLayoutProperty('border-points', 'visibility', activeLayers.borderPoints ? 'visible' : 'none');
-					map.setLayoutProperty('border-points-labels', 'visibility', activeLayers.borderPoints ? 'visible' : 'none');
-				}
-				if (map.getLayer('event-pins')) {
-					map.setLayoutProperty('event-pins', 'visibility', activeLayers.events ? 'visible' : 'none');
-				}
+			// Dev-only handle, so layer problems can be inspected from the console
+			// (and by the browser checks) instead of guessed at from a screenshot.
+			if (import.meta.env.DEV) {
+				(window as unknown as { __granicaMap?: maplibregl.Map }).__granicaMap = instance;
 			}
 		});
 
-		// Update event pins when events change
-		$effect(() => {
-			if (map && map.isStyleLoaded() && map.getSource('event-pins')) {
-				const source = map.getSource('event-pins') as any;
-				source.setData(eventsToGeoJSON(events) as any);
-			}
-		});
+		// MapLibre only watches the window, but this container is resized by the
+		// layout too - the sidebar, and the breakpoint switch between the phone and
+		// desktop arrangements. Without this the canvas keeps a stale size.
+		const observer = new ResizeObserver(() => instance.resize());
+		observer.observe(mapContainer);
 
 		return () => {
-			map.remove();
+			observer.disconnect();
+			ready = false;
+			map = undefined;
+			instance.remove();
 		};
 	});
+
+	function addLayers(m: maplibregl.Map) {
+		// Voivodeship outlines: context, always visible, never implying an alert.
+		m.addSource('woj', { type: 'geojson', data: wojewodztwa as FeatureCollection });
+		m.addLayer({
+			id: 'woj-line',
+			type: 'line',
+			source: 'woj',
+			paint: { 'line-color': MAP_COLORS.boundary, 'line-width': 1, 'line-opacity': 0.55 }
+		});
+
+		// Areas actually named by a current alert. Empty until one is in force.
+		m.addSource('alert-areas', { type: 'geojson', data: EMPTY });
+		m.addLayer({
+			id: 'alert-areas-fill',
+			type: 'fill',
+			source: 'alert-areas',
+			paint: { 'fill-color': MAP_COLORS.attention, 'fill-opacity': 0.28 }
+		});
+		m.addLayer({
+			id: 'alert-areas-line',
+			type: 'line',
+			source: 'alert-areas',
+			paint: { 'line-color': MAP_COLORS.attention, 'line-width': 2 }
+		});
+
+		m.addSource('ua', { type: 'geojson', data: uaOblasts as FeatureCollection });
+		m.addLayer({
+			id: 'ua-line',
+			type: 'line',
+			source: 'ua',
+			paint: {
+				'line-color': MAP_COLORS.boundary,
+				'line-width': 1,
+				'line-opacity': 0.5,
+				'line-dasharray': [3, 2]
+			}
+		});
+		// Filled only for oblasts currently under alarm; `alarm` is set from the feed.
+		m.addLayer({
+			id: 'ua-fill',
+			type: 'fill',
+			source: 'ua',
+			filter: ['in', ['get', 'alarm'], ['literal', ['full', 'partial']]],
+			paint: {
+				'fill-color': MAP_COLORS.uaAlarm,
+				// A partial alarm covers part of the oblast, so it is drawn fainter
+				// than a whole-oblast one rather than implying the same thing.
+				'fill-opacity': ['case', ['==', ['get', 'alarm'], 'full'], 0.3, 0.15]
+			}
+		});
+
+		m.on('click', 'alert-areas-fill', (e: MapLayerMouseEvent) => {
+			const feature = e.features?.[0];
+			if (!feature) return;
+			new maplibregl.Popup({ closeButton: false })
+				.setLngLat(e.lngLat)
+				.setHTML(
+					`<strong>${escapeHtml(String(feature.properties?.label ?? ''))}</strong><br>` +
+						'<span style="color:#5c6675">Obszar objęty alertem RCB</span>'
+				)
+				.addTo(m);
+		});
+
+		m.on('click', 'ua-fill', (e: MapLayerMouseEvent) => {
+			const feature = e.features?.[0];
+			if (!feature) return;
+			const scope = feature.properties?.alarm === 'full' ? 'cały obwód' : 'część obwodu';
+			new maplibregl.Popup({ closeButton: false })
+				.setLngLat(e.lngLat)
+				.setHTML(
+					`<strong>${escapeHtml(String(feature.properties?.name_pl ?? ''))}</strong><br>` +
+						`<span style="color:#5c6675">Alarm powietrzny — ${scope}</span>`
+				)
+				.addTo(m);
+		});
+
+		for (const id of ['alert-areas-fill', 'ua-fill']) {
+			m.on('mouseenter', id, () => (m.getCanvas().style.cursor = 'pointer'));
+			m.on('mouseleave', id, () => (m.getCanvas().style.cursor = ''));
+		}
+	}
+
+	/**
+	 * Border crossings as DOM markers rather than a symbol layer.
+	 *
+	 * A symbol layer needs a glyph endpoint, which a raster-only style has no
+	 * business depending on - the previous version asked for "Open Sans Regular"
+	 * with no `glyphs` set, so every label silently failed to render. Markers keep
+	 * the names visible with nothing external to fetch.
+	 */
+	function addBorderMarkers(m: maplibregl.Map) {
+		for (const feature of (borderPoints as FeatureCollection).features) {
+			if (feature.geometry.type !== 'Point') continue;
+			const props = feature.properties ?? {};
+
+			const el = document.createElement('div');
+			el.className = 'border-marker';
+			el.innerHTML =
+				`<span class="border-marker__dot"></span>` +
+				`<span class="border-marker__label">${escapeHtml(String(props.name ?? ''))}</span>`;
+
+			new maplibregl.Marker({ element: el, anchor: 'left' })
+				.setLngLat(feature.geometry.coordinates as [number, number])
+				.setPopup(
+					new maplibregl.Popup({ closeButton: false, offset: 12 }).setHTML(
+						`<strong>${escapeHtml(String(props.name ?? ''))}</strong><br>` +
+							`<span style="color:#5c6675">${escapeHtml(String(props.description ?? ''))}</span>`
+					)
+				)
+				.addTo(m);
+		}
+	}
+
+	/** Voivodeship or powiat polygons for the areas an alert names. */
+	function areaFeatures(alertAreas: AlertAreas | null): FeatureCollection {
+		if (!alertAreas) return EMPTY;
+
+		// A powiat-scoped alert shades only those powiats: lighting up a whole
+		// voivodeship for a one-powiat siren drill would be a false alarm.
+		if (alertAreas.powiats.length > 0) {
+			if (!powiatData) return EMPTY;
+			const wanted = new Set(alertAreas.powiats.map((p) => `${p.name}|${p.voivodeship}`));
+			return {
+				type: 'FeatureCollection',
+				features: powiatData.features
+					.filter((f: Feature) => wanted.has(`${f.properties?.nazwa}|${f.properties?.wojewodztwo}`))
+					.map((f: Feature) => ({
+						...f,
+						properties: { ...f.properties, label: f.properties?.nazwa }
+					}))
+			};
+		}
+
+		const wanted = new Set(alertAreas.voivodeships);
+		return {
+			type: 'FeatureCollection',
+			features: (wojewodztwa as FeatureCollection).features
+				.filter((f: Feature) => wanted.has(String(f.properties?.nazwa)))
+				.map((f: Feature) => ({
+					...f,
+					properties: { ...f.properties, label: `woj. ${f.properties?.nazwa}` }
+				}))
+		};
+	}
+
+	function escapeHtml(value: string): string {
+		return value.replace(
+			/[&<>"']/g,
+			(c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c
+		);
+	}
+
+	// Fetch powiat geometry only once an alert actually names a powiat.
+	$effect(() => {
+		if (!areas || areas.powiats.length === 0 || powiatData) return;
+		let cancelled = false;
+		import('$lib/data/powiaty.json').then((module) => {
+			if (!cancelled) powiatData = module.default as unknown as FeatureCollection;
+		});
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	// Shade the areas under alert. Reads `ready` so it re-runs once the style is
+	// loaded - the previous version guarded on isStyleLoaded(), which was false on
+	// the first run and so registered no dependency and never ran again.
+	$effect(() => {
+		if (!ready || !map) return;
+		const source = map.getSource('alert-areas') as GeoJSONSource | undefined;
+		source?.setData(areaFeatures(areas));
+	});
+
+	// Mark which oblasts are under alarm.
+	$effect(() => {
+		if (!ready || !map) return;
+		const byIso = new Map(oblasts.map((o) => [o.iso, o.scope]));
+		const source = map.getSource('ua') as GeoJSONSource | undefined;
+		source?.setData({
+			type: 'FeatureCollection',
+			features: (uaOblasts as FeatureCollection).features.map((f: Feature) => ({
+				...f,
+				properties: {
+					...f.properties,
+					alarm: byIso.get(String(f.properties?.iso)) ?? 'none'
+				}
+			}))
+		});
+	});
+
+	$effect(() => {
+		if (!ready || !map) return;
+		const visibility = (on: boolean) => (on ? 'visible' : 'none');
+		for (const id of ['alert-areas-fill', 'alert-areas-line']) {
+			map.setLayoutProperty(id, 'visibility', visibility(activeLayers.alertAreas));
+		}
+		for (const id of ['ua-fill', 'ua-line']) {
+			map.setLayoutProperty(id, 'visibility', visibility(activeLayers.uaOblasts));
+		}
+		mapContainer
+			.querySelectorAll<HTMLElement>('.border-marker')
+			.forEach((el) => (el.style.display = activeLayers.borderPoints ? '' : 'none'));
+	});
+
+	// Centre on the user's own voivodeship when they have chosen one.
+	$effect(() => {
+		if (!ready || !map || !focusArea) return;
+		const feature = (wojewodztwa as FeatureCollection).features.find(
+			(f: Feature) => f.properties?.nazwa === focusArea
+		);
+		if (feature) map.fitBounds(bboxOf(feature), { padding: 48, duration: 600 });
+	});
+
+	function bboxOf(feature: Feature): [[number, number], [number, number]] {
+		let minX = 180;
+		let minY = 90;
+		let maxX = -180;
+		let maxY = -90;
+
+		const visit = (coords: unknown): void => {
+			if (Array.isArray(coords) && typeof coords[0] === 'number') {
+				const [x, y] = coords as [number, number];
+				minX = Math.min(minX, x);
+				maxX = Math.max(maxX, x);
+				minY = Math.min(minY, y);
+				maxY = Math.max(maxY, y);
+				return;
+			}
+			if (Array.isArray(coords)) coords.forEach(visit);
+		};
+
+		visit((feature.geometry as { coordinates: unknown }).coordinates);
+		return [
+			[minX, minY],
+			[maxX, maxY]
+		];
+	}
 </script>
 
 <div bind:this={mapContainer} class="h-full w-full"></div>
+
+<style>
+	:global(.border-marker) {
+		display: flex;
+		align-items: center;
+		gap: 0.3rem;
+		cursor: pointer;
+	}
+
+	:global(.border-marker__dot) {
+		width: 0.55rem;
+		height: 0.55rem;
+		flex: none;
+		border-radius: 9999px;
+		background: #3a5f7a;
+		box-shadow: 0 0 0 2px #fff;
+	}
+
+	:global(.border-marker__label) {
+		font-size: 0.6875rem;
+		line-height: 1;
+		color: #1c2430;
+		white-space: nowrap;
+		text-shadow:
+			0 0 2px #fff,
+			0 0 3px #fff,
+			0 0 4px #fff;
+	}
+</style>

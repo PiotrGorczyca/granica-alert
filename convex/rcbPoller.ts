@@ -1,20 +1,74 @@
 import { action } from './_generated/server';
+import type { ActionCtx } from './_generated/server';
 import { api } from './_generated/api';
-import { v } from 'convex/values';
+import { parseListing, parseDetail, buildKomunikat } from './lib/rcbParser.ts';
+import { USER_AGENT } from './lib/http.ts';
 
-// RCB poller - fetches from gov.pl and stores new komunikaty
+const LISTING_URL = 'https://www.gov.pl/web/rcb/komunikaty';
+
+/**
+ * Detail-page requests per run, shared between new komunikaty and re-reads.
+ *
+ * Most runs spend far less: gov.pl supports conditional requests, so re-reading
+ * an unchanged komunikat is an empty 304, and lib/refreshSchedule keeps settled
+ * komunikaty out of the queue entirely.
+ */
+const DETAIL_BUDGET = 8;
+
+/**
+ * How large a gap in polling still counts as "watching continuously".
+ *
+ * The cron runs every 5 minutes. Within this tolerance, the moment we first see
+ * a komunikat is within minutes of RCB publishing it, and is worth recording as
+ * a time. Past it - a first run, an outage, a redeploy - a komunikat we have just
+ * found could have been published hours ago, so we fall back to the only thing
+ * the source actually states: the date.
+ */
+const CONTINUOUS_POLL_TOLERANCE_MINUTES = 15;
+
+/**
+ * Annotated explicitly: the handler calls queries reached through `api`, whose
+ * type includes this action, so inference would be circular.
+ */
+type RefreshCounts = { checked: number; refreshed: number; not_modified: number };
+
+type PollResult =
+	| ({ success: true; listing: 'not_modified' } & RefreshCounts)
+	| ({ success: true; listing: 'fetched'; new_count: number; total_found: number } & RefreshCounts)
+	| { success: false; error: string };
+
+/**
+ * Poll RCB komunikaty.
+ *
+ * There is deliberately no fixture fallback. If the page cannot be parsed the
+ * source is marked stale and nothing is written - this app publishes official
+ * communications, so inventing one to fill a gap would be the worst thing it
+ * could do.
+ */
 export const pollRcb = action({
 	args: {},
-	handler: async (ctx) => {
-		const rcbUrl = 'https://www.gov.pl/web/rcb/komunikaty';
-
+	handler: async (ctx): Promise<PollResult> => {
 		try {
-			console.log('Polling RCB komunikaty...');
-			const response = await fetch(rcbUrl, {
+			const sourceState = await ctx.runQuery(api.queries.getSourceState, { source_name: 'rcb' });
+			const detectedPromptly = isContinuous(sourceState.last_successful_fetch);
+
+			const response = await fetch(LISTING_URL, {
 				headers: {
-					'User-Agent': 'Granica Alert MVP/0.1 (civic air awareness; contact: dev@example.com)'
+					'User-Agent': USER_AGENT,
+					...(sourceState.etag ? { 'If-None-Match': sourceState.etag } : {})
 				}
 			});
+
+			// Listing unchanged since the last poll: nothing new to find, but the
+			// komunikaty we already hold may still be due for a re-read.
+			if (response.status === 304) {
+				const refreshed = await refreshRecent(ctx, DETAIL_BUDGET);
+				await ctx.runMutation(api.mutations.updateSourceStatus, {
+					source_name: 'rcb',
+					status: 'ok'
+				});
+				return { success: true, listing: 'not_modified' as const, ...refreshed };
+			}
 
 			if (!response.ok) {
 				await ctx.runMutation(api.mutations.updateSourceStatus, {
@@ -25,26 +79,91 @@ export const pollRcb = action({
 				return { success: false, error: `HTTP ${response.status}` };
 			}
 
-			const html = await response.text();
-			const komunikaty = parseRcbKomunikaty(html);
+			const items = parseListing(await response.text());
 
-			console.log(`Found ${komunikaty.length} komunikaty on page`);
-
-			let newCount = 0;
-			for (const komunikat of komunikaty) {
-				const stored = await ctx.runMutation(api.mutations.storeRcbKomunikat, {
-					komunikat
+			if (items.length === 0) {
+				// The page loaded but we understood none of it - the layout changed.
+				await ctx.runMutation(api.mutations.updateSourceStatus, {
+					source_name: 'rcb',
+					status: 'stale',
+					error_message: 'Listing loaded but no komunikaty could be parsed (layout change?)',
+					items_seen: 0
 				});
-				if (stored) newCount++;
+				return { success: false, error: 'no_items_parsed' };
 			}
+
+			const unseen = new Set(
+				await ctx.runQuery(api.queries.filterUnseenRcbUrls, {
+					urls: items.map((item) => item.url)
+				})
+			);
+
+			let stored = 0;
+			let spent = 0;
+
+			for (const item of items) {
+				if (!unseen.has(item.url)) continue;
+
+				// Only the detail page carries the scope sentence naming voivodeships,
+				// so it is worth one extra request per genuinely new komunikat.
+				let detailBody = '';
+				let detailEtag: string | undefined;
+				if (spent < DETAIL_BUDGET) {
+					spent++;
+					const detail = await fetchDetail(item.url);
+					if (detail.status === 'ok') {
+						detailBody = detail.body;
+						detailEtag = detail.etag;
+					}
+				}
+
+				const komunikat = buildKomunikat(item, detailBody);
+				const didStore = await ctx.runMutation(api.mutations.storeRcbKomunikat, {
+					komunikat: {
+						url: komunikat.url,
+						title: komunikat.title,
+						date: komunikat.date,
+						body: komunikat.body,
+						type: komunikat.type,
+						cancelled: komunikat.cancelled,
+						areas: komunikat.areas,
+						detectedPromptly
+					}
+				});
+
+				if (didStore) {
+					stored++;
+					await ctx.runMutation(api.mutations.recordRcbRefresh, {
+						sourceUrl: komunikat.url,
+						etag: detailEtag,
+						refreshedAt: new Date().toISOString()
+					});
+				}
+			}
+
+			const listingEtag = response.headers.get('etag');
+			if (listingEtag) {
+				await ctx.runMutation(api.mutations.recordSourceEtag, {
+					source_name: 'rcb',
+					etag: listingEtag
+				});
+			}
+
+			const refreshed = await refreshRecent(ctx, DETAIL_BUDGET - spent);
 
 			await ctx.runMutation(api.mutations.updateSourceStatus, {
 				source_name: 'rcb',
-				status: 'ok'
+				status: 'ok',
+				items_seen: items.length
 			});
 
-			console.log(`Stored ${newCount} new komunikaty`);
-			return { success: true, new_count: newCount, total_found: komunikaty.length };
+			return {
+				success: true,
+				listing: 'fetched' as const,
+				new_count: stored,
+				total_found: items.length,
+				...refreshed
+			};
 		} catch (error) {
 			console.error('RCB poll error:', error);
 			await ctx.runMutation(api.mutations.updateSourceStatus, {
@@ -57,113 +176,117 @@ export const pollRcb = action({
 	}
 });
 
-interface RcbKomunikat {
-	id: string;
-	title: string;
-	url: string;
-	date: string;
-	type: 'rcb_air' | 'rcb_other';
-	body?: string;
-}
+/**
+ * Re-read the komunikaty that are due, and apply any edits RCB has made.
+ *
+ * This is not a backfill. It is how the scope arrives at all for a good share of
+ * alerts: RCB publishes the alert text first and appends the "wysłany do
+ * odbiorców na terenie woj: ..." line minutes later, so the version we see on
+ * first sight often names no area yet.
+ */
+async function refreshRecent(ctx: ActionCtx, budget: number): Promise<RefreshCounts> {
+	const result: RefreshCounts = { checked: 0, refreshed: 0, not_modified: 0 };
+	if (budget <= 0) return result;
 
-// Parse RCB komunikaty list page
-// Fallback fixture if live scrape is flaky
-function parseRcbKomunikaty(html: string): RcbKomunikat[] {
-	const komunikaty: RcbKomunikat[] = [];
+	const candidates = await ctx.runQuery(api.queries.getRcbEventsForRefresh, { limit: budget });
 
-	try {
-		// Simple regex-based parsing for MVP
-		// Match article items (typical gov.pl structure)
-		const articlePattern = /<article[^>]*>[\s\S]*?<\/article>/gi;
-		const articles = html.match(articlePattern) || [];
+	for (const candidate of candidates) {
+		result.checked++;
+		const detail = await fetchDetail(candidate.source_url, candidate.etag ?? undefined);
+		const refreshedAt = new Date().toISOString();
 
-		for (const article of articles.slice(0, 20)) {
-			// Limit to recent 20
-			// Extract URL
-			const urlMatch = article.match(/href="([^"]*komunikat[^"]*)"/i);
-			if (!urlMatch) continue;
+		if (detail.status === 'error') continue;
 
-			const url = urlMatch[1].startsWith('http') ? urlMatch[1] : `https://www.gov.pl${urlMatch[1]}`;
+		// Every remaining outcome moves last_refreshed_at. A withdrawn or unchanged
+		// komunikat left permanently "due" would be retried on every poll, which is
+		// precisely the request storm this schedule exists to prevent.
+		await ctx.runMutation(api.mutations.recordRcbRefresh, {
+			sourceUrl: candidate.source_url,
+			etag: detail.status === 'gone' ? undefined : detail.etag,
+			refreshedAt
+		});
 
-			// Extract title
-			const titleMatch = article.match(/<h[2-4][^>]*>(.*?)<\/h[2-4]>/i);
-			const title = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '').trim() : '';
-
-			if (!title) continue;
-
-			// Extract date
-			const dateMatch = article.match(/(\d{4}-\d{2}-\d{2})|(\d{2}\.\d{2}\.\d{4})/);
-			const dateStr = dateMatch ? dateMatch[0] : new Date().toISOString().split('T')[0];
-
-			// Classify based on keywords
-			const lowerTitle = title.toLowerCase();
-			const lowerArticle = article.toLowerCase();
-
-			const isAir =
-				lowerTitle.includes('nalot') ||
-				lowerTitle.includes('lotnictw') ||
-				lowerTitle.includes('przestrze') ||
-				lowerTitle.includes('ukrain') ||
-				lowerArticle.includes('lotnictwo') ||
-				lowerArticle.includes('przestrzeni powietrznej');
-
-			const isTraining =
-				lowerTitle.includes('trening') ||
-				lowerTitle.includes('ćwiczenie') ||
-				lowerTitle.includes('próbn') ||
-				lowerTitle.includes('test');
-
-			const type: 'rcb_air' | 'rcb_other' = isAir && !isTraining ? 'rcb_air' : 'rcb_other';
-
-			komunikaty.push({
-				id: url,
-				title,
-				url,
-				date: normalizeDateToISO(dateStr),
-				type
+		if (detail.status === 'gone') {
+			await ctx.runMutation(api.mutations.setRcbSourceAvailability, {
+				eventId: candidate.id,
+				available: false
 			});
+			continue;
 		}
+
+		if (detail.status === 'not_modified') {
+			result.not_modified++;
+			continue;
+		}
+
+		await ctx.runMutation(api.mutations.setRcbSourceAvailability, {
+			eventId: candidate.id,
+			available: true
+		});
+
+		if (detail.body === candidate.body) continue;
+
+		const komunikat = buildKomunikat(
+			{ url: candidate.source_url, title: candidate.title, date: '', intro: '' },
+			detail.body
+		);
+
+		const didUpdate = await ctx.runMutation(api.mutations.updateRcbKomunikat, {
+			eventId: candidate.id,
+			body: detail.body,
+			type: komunikat.type,
+			cancelled: komunikat.cancelled,
+			areas: komunikat.areas
+		});
+		if (didUpdate) result.refreshed++;
+	}
+
+	return result;
+}
+
+/**
+ * Were we watching without a gap when this komunikat turned up?
+ *
+ * Never having fetched successfully counts as a gap: the first run sees the whole
+ * listing at once, and none of it was published just then.
+ */
+function isContinuous(lastSuccessfulFetch: string | null): boolean {
+	if (!lastSuccessfulFetch) return false;
+
+	const gapMinutes = (Date.now() - Date.parse(lastSuccessfulFetch)) / 60_000;
+	if (!Number.isFinite(gapMinutes) || gapMinutes < 0) return false;
+
+	return gapMinutes <= CONTINUOUS_POLL_TOLERANCE_MINUTES;
+}
+
+type DetailResult =
+	| { status: 'ok'; body: string; etag?: string }
+	/** gov.pl confirmed the page is unchanged; no body was transferred. */
+	| { status: 'not_modified'; etag?: string }
+	/** gov.pl returned 404/410 - the komunikat has been withdrawn. */
+	| { status: 'gone' }
+	| { status: 'error' };
+
+async function fetchDetail(url: string, etag?: string): Promise<DetailResult> {
+	try {
+		const response = await fetch(url, {
+			headers: {
+				'User-Agent': USER_AGENT,
+				...(etag ? { 'If-None-Match': etag } : {})
+			}
+		});
+
+		if (response.status === 304) return { status: 'not_modified', etag };
+		if (response.status === 404 || response.status === 410) return { status: 'gone' };
+		if (!response.ok) return { status: 'error' };
+
+		const body = parseDetail(await response.text());
+		if (!body) return { status: 'error' };
+
+		return { status: 'ok', body, etag: response.headers.get('etag') ?? undefined };
 	} catch (error) {
-		console.error('Parse error, using fixture fallback:', error);
-		return getFixtureFallback();
+		// A failed detail fetch costs us the scope, not the komunikat itself.
+		console.error(`RCB detail fetch failed for ${url}:`, error);
+		return { status: 'error' };
 	}
-
-	// If parsing yielded nothing, use fixture
-	return komunikaty.length > 0 ? komunikaty : getFixtureFallback();
-}
-
-// Fixture fallback for development and if live scrape fails
-function getFixtureFallback(): RcbKomunikat[] {
-	const now = new Date();
-	const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-
-	return [
-		{
-			id: 'fixture-rcb-air-1',
-			title: 'Komunikat RCB: Nalot na terytorium Ukrainy - operowanie polskiego lotnictwa',
-			url: 'https://www.gov.pl/web/rcb/komunikaty',
-			date: oneHourAgo.toISOString(),
-			type: 'rcb_air',
-			body: 'W związku z atakiem powietrznym na obiekty znajdujące się na terytorium Ukrainy istnieje prawdopodobieństwo, że w polskiej przestrzeni powietrznej operują polskie i sojusznicze statki powietrzne. Mogą być związane z tym drgania szyb oraz hałas.'
-		}
-	];
-}
-
-function normalizeDateToISO(dateStr: string): string {
-	// Try to parse various date formats
-	if (dateStr.includes('-')) {
-		// Already YYYY-MM-DD or ISO
-		return dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00Z`;
-	}
-
-	if (dateStr.includes('.')) {
-		// DD.MM.YYYY format
-		const parts = dateStr.split('.');
-		if (parts.length === 3) {
-			return `${parts[2]}-${parts[1]}-${parts[0]}T00:00:00Z`;
-		}
-	}
-
-	// Fallback
-	return new Date().toISOString();
 }

@@ -1,208 +1,150 @@
 <script lang="ts">
-	import MapLayerToggles from './MapLayerToggles.svelte';
+	import AreaPicker from './AreaPicker.svelte';
+	import SituationBanner from './SituationBanner.svelte';
+	import type { MapLayers } from '$lib/types';
+	import type { AreaVerdict } from '$lib/userArea';
 	import type { PageData } from '../../routes/$types';
 
-	let { 
-		activeLayers = $bindable({
-			epR134: true,
-			borderPoints: true,
-			events: true
+	let {
+		activeLayers = $bindable<MapLayers>({
+			alertAreas: true,
+			uaOblasts: true,
+			borderPoints: true
 		}),
-		selectedEvent = null,
-		collapsed = false,
-		onToggleCollapse
+		myArea = $bindable<string | null>(null),
+		status,
+		verdict,
+		events = []
 	}: {
-		activeLayers: {
-			epR134: boolean;
-			borderPoints: boolean;
-			events: boolean;
-		};
-		selectedEvent: PageData['events'][0] | null;
-		collapsed: boolean;
-		onToggleCollapse: () => void;
+		activeLayers: MapLayers;
+		myArea: string | null;
+		status: PageData['status'];
+		verdict: AreaVerdict;
+		events?: PageData['events'];
 	} = $props();
 
-	const eventTypeLabels: Record<string, string> = {
-		rcb_air: 'RCB powietrzny',
+	const layers = [
+		{ key: 'alertAreas' as const, label: 'Obszary alertu RCB', swatch: 'bg-attention' },
+		{ key: 'uaOblasts' as const, label: 'Alarmy w zach. Ukrainie', swatch: 'bg-critical' },
+		{ key: 'borderPoints' as const, label: 'Przejścia graniczne', swatch: 'bg-info' }
+	];
+
+	/** Official communications only - news never appears on the map. */
+	const officialEvents = $derived(
+		events.filter(
+			(e) => e.type === 'rcb_air' || e.type === 'rcb_other' || e.type === 'ua_raid_west'
+		)
+	);
+
+	const typeLabels: Record<string, string> = {
+		rcb_air: 'RCB · powietrze',
 		rcb_other: 'RCB',
-		dorsz_ops: 'DORSZ',
-		dorsz_violation: 'DORSZ naruszenie',
-		ua_raid_west: 'UA nalot',
-		notam_zone: 'NOTAM',
-		incident: 'Incydent',
-		news: 'Wiadomość medialna',
-		osint: 'OSINT'
+		ua_raid_west: 'Alarm UA'
 	};
 
-	function isNewsType(type: string): boolean {
-		return type === 'news' || type === 'osint';
+	function when(event: PageData['events'][number]): string {
+		if (event.time_precision === 'day' && event.published_date) return event.published_date;
+		return new Date(event.published_at).toLocaleString('pl-PL', {
+			day: '2-digit',
+			month: '2-digit',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
 	}
 
-	const violationLabels: Record<string, string> = {
-		yes: 'Tak',
-		no: 'Nie',
-		unknown: 'Nieznane',
-		not_applicable: 'Nie dotyczy'
-	};
-
-	function getTimeSince(isoString: string) {
-		const now = Date.now();
-		const then = new Date(isoString).getTime();
-		const diffMinutes = Math.floor((now - then) / 60000);
-
-		if (diffMinutes < 1) return 'przed chwilą';
-		if (diffMinutes < 60) return `${diffMinutes} min temu`;
-
-		const diffHours = Math.floor(diffMinutes / 60);
-		if (diffHours < 24) return `${diffHours}h temu`;
-
-		const diffDays = Math.floor(diffHours / 24);
-		return `${diffDays} dni temu`;
+	function areaSummary(event: PageData['events'][number]): string {
+		const areas = event.areas;
+		if (!areas) return '';
+		if (areas.powiats.length > 0) return areas.powiats.map((p) => p.name).join(', ');
+		if (areas.voivodeships.length > 0) return `woj. ${areas.voivodeships.join(', ')}`;
+		if (areas.unplaceablePowiats.length > 0) return areas.unplaceablePowiats.join(', ');
+		return '';
 	}
 </script>
 
-{#if collapsed}
-	<!-- Collapsed state: icon rail -->
-	<div class="flex h-full flex-col items-center py-4">
-		<button
-			onclick={onToggleCollapse}
-			class="mb-4 rounded p-2 text-ink-muted hover:bg-bg hover:text-ink"
-			aria-label="Rozwiń panel"
-		>
-			<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-			</svg>
-		</button>
-		<div class="flex flex-col gap-2">
-			<div class="rounded p-2 text-center text-xs text-ink-muted" title="Warstwy">
-				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+<div class="flex h-full flex-col">
+	<div class="border-b border-border p-4">
+		<h1 class="text-sm font-semibold text-ink">Granica Alert</h1>
+		<p class="mt-0.5 text-xs text-ink-muted">Świadomość sytuacyjna wschodniej Polski</p>
+	</div>
+
+	<div class="border-b border-border p-4">
+		<SituationBanner
+			state={status?.rcb_air_state ?? 'none'}
+			dataFresh={status?.rcb_data_fresh ?? false}
+			rcbAir={status?.rcb_air ?? null}
+			windowMinutes={status?.rcb_air_window_minutes ?? 120}
+			{verdict}
+			oblasts={status?.ua_oblasts ?? []}
+		/>
+	</div>
+
+	<div class="border-b border-border p-4">
+		<AreaPicker bind:myArea />
+	</div>
+
+	<div class="border-b border-border p-4">
+		<h2 class="mb-2 text-xs font-semibold tracking-wide text-ink-muted uppercase">Warstwy</h2>
+		<div class="space-y-2">
+			{#each layers as layer (layer.key)}
+				<label class="flex items-center gap-2 text-sm">
+					<input
+						type="checkbox"
+						bind:checked={activeLayers[layer.key]}
+						class="h-4 w-4 rounded border-border text-calm focus:ring-calm"
 					/>
-				</svg>
-			</div>
+					<span class="h-2.5 w-2.5 rounded-sm {layer.swatch}"></span>
+					<span class="text-ink">{layer.label}</span>
+				</label>
+			{/each}
 		</div>
+		<p class="mt-3 border-t border-border pt-2 text-xs text-ink-muted">
+			Zaznaczamy wyłącznie obszary wskazane w treści oficjalnych komunikatów.
+		</p>
 	</div>
-{:else}
-	<!-- Expanded state -->
-	<div class="flex h-full flex-col">
-		<!-- Header -->
-		<div class="flex items-center justify-between border-b border-border px-4 py-3">
-			<h2 class="text-sm font-semibold text-ink">Panel mapy</h2>
-			<button
-				onclick={onToggleCollapse}
-				class="rounded p-1 text-ink-muted hover:bg-bg hover:text-ink"
-				aria-label="Zwiń panel"
-			>
-				<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-				</svg>
-			</button>
-		</div>
 
-		<!-- Scrollable content -->
-		<div class="flex-1 overflow-y-auto">
-			<!-- Layers section -->
-			<div class="border-b border-border p-4">
-				<h3 class="mb-3 text-xs font-semibold uppercase text-ink-muted">Warstwy</h3>
-				<div class="space-y-2">
-					<label class="flex items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							bind:checked={activeLayers.epR134}
-							class="h-4 w-4 rounded border-border text-calm focus:ring-calm"
-						/>
-						<span class="text-ink">🟨 Strefa EP R134</span>
-					</label>
-					<label class="flex items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							bind:checked={activeLayers.events}
-							class="h-4 w-4 rounded border-border text-calm focus:ring-calm"
-						/>
-						<span class="text-ink">⚡ Wydarzenia</span>
-					</label>
-					<label class="flex items-center gap-2 text-sm">
-						<input
-							type="checkbox"
-							bind:checked={activeLayers.borderPoints}
-							class="h-4 w-4 rounded border-border text-calm focus:ring-calm"
-						/>
-						<span class="text-ink">📍 Granica / kontekst</span>
-					</label>
-				</div>
-				<div class="mt-3 border-t border-border pt-2">
-					<p class="text-xs text-ink-muted">
-						Tylko kontekst oficjalnych komunikatów — bez śledzenia wojsk.
-					</p>
-				</div>
-			</div>
+	<div class="flex-1 overflow-y-auto p-4">
+		<h2 class="mb-2 text-xs font-semibold tracking-wide text-ink-muted uppercase">
+			Komunikaty oficjalne
+		</h2>
 
-			<!-- Selected event section -->
-			{#if selectedEvent}
-				<div class="border-b border-border p-4">
-					<h3 class="mb-3 text-xs font-semibold uppercase text-ink-muted">Wybrane wydarzenie</h3>
-					<div class="space-y-2 rounded border border-border bg-bg p-3">
-						<div class="flex items-start justify-between gap-2">
-							<span class="inline-block rounded bg-info px-2 py-0.5 text-xs font-medium text-surface">
-								{eventTypeLabels[selectedEvent.type] || selectedEvent.type}
+		{#if officialEvents.length === 0}
+			<p class="text-xs text-ink-muted">Brak komunikatów w ostatnim czasie.</p>
+		{:else}
+			<ul class="space-y-3">
+				{#each officialEvents as event (event._id)}
+					<li class="border-b border-border pb-3 last:border-0">
+						<div class="flex items-baseline justify-between gap-2">
+							<span class="text-[11px] font-medium text-ink-muted">
+								{typeLabels[event.type] ?? event.type}
 							</span>
-							<span class="text-xs text-ink-muted">
-								{getTimeSince(selectedEvent.published_at)}
-							</span>
+							<span class="text-[11px] text-ink-muted">{when(event)}</span>
 						</div>
-						{#if isNewsType(selectedEvent.type)}
-							<div class="flex items-center gap-1.5 rounded border border-amber-500 bg-amber-50 px-2 py-1 text-xs">
-								<svg class="h-3 w-3 flex-shrink-0 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-									<path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-								</svg>
-								<span class="font-medium text-amber-900">Nieoficjalne</span>
-							</div>
+						<p class="mt-0.5 text-xs leading-snug text-ink">{event.title}</p>
+						{#if areaSummary(event)}
+							<p class="mt-0.5 text-[11px] text-ink-muted">{areaSummary(event)}</p>
 						{/if}
-						<p class="text-sm font-medium text-ink">{selectedEvent.title}</p>
-						{#if selectedEvent.polish_airspace_violation && selectedEvent.polish_airspace_violation !== 'not_applicable'}
-							<div class="text-xs text-ink-muted">
-								<span class="font-medium">Naruszenie RP:</span>
-								{violationLabels[selectedEvent.polish_airspace_violation]}
-							</div>
-						{/if}
-						<div class="flex items-center gap-2 border-t border-border pt-2">
-							<a
-								href={selectedEvent.source_url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="text-xs text-info hover:underline"
+						{#if event.cancelled}
+							<span
+								class="mt-1 inline-block rounded bg-calm-bg px-1.5 py-0.5 text-[11px] text-calm"
 							>
-								Źródło ↗
-							</a>
-							<a href="/dom" class="text-xs text-info hover:underline">
-								Szczegóły →
-							</a>
-						</div>
-					</div>
-				</div>
-			{/if}
+								odwołany
+							</span>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+		{/if}
 
-			<!-- Quick links -->
-			<div class="p-4">
-				<h3 class="mb-3 text-xs font-semibold uppercase text-ink-muted">Szybkie linki</h3>
-				<div class="space-y-2 text-sm">
-					<a href="/dom" class="block text-info hover:underline">
-						Zobacz pełną listę →
-					</a>
-					<a
-						href="https://www.gov.pl/web/rcb/komunikaty"
-						target="_blank"
-						rel="noopener noreferrer"
-						class="block text-info hover:underline"
-					>
-						Oficjalne komunikaty RCB ↗
-					</a>
-				</div>
-			</div>
-		</div>
+		<a href="/dom" class="mt-3 inline-block text-xs text-info hover:underline">
+			Pełna lista, w tym media →
+		</a>
 	</div>
-{/if}
+
+	<div class="border-t border-border p-3">
+		<p class="text-[11px] leading-snug text-ink-muted">
+			Nieoficjalne narzędzie obywatelskie. Nie jest produktem RCB ani MON. W razie zagrożenia kieruj
+			się komunikatami służb.
+		</p>
+	</div>
+</div>

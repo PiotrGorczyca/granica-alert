@@ -1,89 +1,96 @@
 {
   "type": "FeatureCollection",
+  "note": "Road border crossings on Poland's eastern frontier. Coordinates are the crossing on the Polish side, from OpenStreetMap. Descriptions state only what the crossing is - operating status changes and is not tracked here.",
   "features": [
     {
       "type": "Feature",
       "properties": {
-        "name": "Dorohusk–Yahodyn",
-        "description": "Przejście graniczne Polska-Ukraina",
-        "type": "border_crossing"
+        "name": "Terespol–Brześć",
+        "description": "Przejście graniczne Polska–Białoruś (drogowe)",
+        "type": "border_crossing",
+        "country": "BY"
       },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [23.9167, 51.2833]
-      }
+      "geometry": { "type": "Point", "coordinates": [23.6208, 52.0758] }
     },
     {
       "type": "Feature",
       "properties": {
-        "name": "Korytnica",
-        "description": "Przejście graniczne Polska-Ukraina",
-        "type": "border_crossing"
+        "name": "Kukuryki–Kozłowiczy",
+        "description": "Przejście graniczne Polska–Białoruś (towarowe)",
+        "type": "border_crossing",
+        "country": "BY"
       },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [23.6833, 50.9667]
-      }
+      "geometry": { "type": "Point", "coordinates": [23.6017, 52.1428] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Dorohusk–Jagodzin",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
+      },
+      "geometry": { "type": "Point", "coordinates": [23.7361, 51.1656] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Zosin–Uściług",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
+      },
+      "geometry": { "type": "Point", "coordinates": [24.1103, 50.8792] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Hrebenne–Rawa Ruska",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
+      },
+      "geometry": { "type": "Point", "coordinates": [23.6006, 50.2803] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Korczowa–Krakowiec",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe, A4)",
+        "type": "border_crossing",
+        "country": "UA"
+      },
+      "geometry": { "type": "Point", "coordinates": [23.1039, 49.9675] }
     },
     {
       "type": "Feature",
       "properties": {
         "name": "Medyka–Szeginie",
-        "description": "Przejście graniczne Polska-Ukraina",
-        "type": "border_crossing"
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
       },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [22.9333, 49.8]
-      }
+      "geometry": { "type": "Point", "coordinates": [22.9278, 49.8028] }
     },
     {
       "type": "Feature",
       "properties": {
-        "name": "Hrebenne",
-        "description": "Przejście graniczne Polska-Ukraina",
-        "type": "border_crossing"
+        "name": "Budomierz–Hruszew",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
       },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [23.8167, 50.5]
-      }
+      "geometry": { "type": "Point", "coordinates": [23.1728, 50.1050] }
     },
     {
       "type": "Feature",
       "properties": {
-        "name": "Terespol–Brześć",
-        "description": "Przejście graniczne Polska-Białoruś",
-        "type": "border_crossing"
+        "name": "Krościenko–Smolnica",
+        "description": "Przejście graniczne Polska–Ukraina (drogowe)",
+        "type": "border_crossing",
+        "country": "UA"
       },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [23.6167, 52.0833]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Korytarz Suwalski",
-        "description": "Strategiczny korytarz graniczny między Polską a Litwą",
-        "type": "context_area"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [23.1, 54.2]
-      }
-    },
-    {
-      "type": "Feature",
-      "properties": {
-        "name": "Obwód Kaliningrad",
-        "description": "Rosyjski eksklawa przy granicy z Polską",
-        "type": "context_area"
-      },
-      "geometry": {
-        "type": "Point",
-        "coordinates": [20.5, 54.7]
-      }
+      "geometry": { "type": "Point", "coordinates": [22.6503, 49.2489] }
     }
   ]
 }

@@ -72,9 +72,8 @@
 					<ul class="ml-4 list-inside list-disc space-y-1">
 						<li>Ukraina jest atakowana przez Rosję</li>
 						<li>
-							Polskie i sojusznicze myśliwce <strong class="text-ink"
-								>prewencyjnie</strong
-							> wznoszą się w powietrze
+							Polskie i sojusznicze myśliwce <strong class="text-ink">prewencyjnie</strong> wznoszą się
+							w powietrze
 						</li>
 						<li>To <strong class="text-ink">NIE oznacza</strong> ataku na Polskę</li>
 						<li>
@@ -106,23 +105,19 @@
 			</section>
 
 			<section class="mb-6 rounded-lg border border-border bg-surface p-6 shadow-sm">
-				<h2 class="mb-3 text-lg font-semibold text-ink">
-					Dlaczego ADS-B ≠ wykrywanie zagrożeń
-				</h2>
+				<h2 class="mb-3 text-lg font-semibold text-ink">Dlaczego ADS-B ≠ wykrywanie zagrożeń</h2>
 
 				<p class="text-sm text-ink-muted">
 					ADS-B pokazuje samoloty cywilne i niektóre wojskowe, które <strong class="text-ink"
 						>chcą być widziane</strong
-					>. Drony bojowe i pociski manewrujące <strong class="text-ink">nie nadają ADS-B</strong
-					>. Śledzenie ruchu lotniczego może pokazać "nietypowy wzór", ale nie potwierdza
-					zagrożenia - do tego potrzebne są oficjalne komunikaty DORSZ lub RCB.
+					>. Drony bojowe i pociski manewrujące <strong class="text-ink">nie nadają ADS-B</strong>.
+					Śledzenie ruchu lotniczego może pokazać "nietypowy wzór", ale nie potwierdza zagrożenia -
+					do tego potrzebne są oficjalne komunikaty DORSZ lub RCB.
 				</p>
 			</section>
 
 			<section class="rounded-lg border border-attention bg-attention-bg p-6">
-				<h2 class="mb-3 text-lg font-semibold text-attention">
-					OPSEC - Bezpieczeństwo operacyjne
-				</h2>
+				<h2 class="mb-3 text-lg font-semibold text-attention">OPSEC - Bezpieczeństwo operacyjne</h2>
 
 				<p class="text-sm text-ink">
 					<strong>Nie publikuj w czasie rzeczywistym:</strong>

@@ -15,11 +15,7 @@
 	<main class="mx-auto max-w-4xl px-4 py-6">
 		<div class="mb-6 rounded-lg border border-info bg-info-bg p-6">
 			<div class="flex gap-3">
-				<svg
-					class="mt-0.5 h-5 w-5 flex-shrink-0 text-info"
-					fill="currentColor"
-					viewBox="0 0 20 20"
-				>
+				<svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-info" fill="currentColor" viewBox="0 0 20 20">
 					<path
 						fill-rule="evenodd"
 						d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -52,7 +48,9 @@
 				<div class="flex items-start justify-between border-b border-border py-3">
 					<div>
 						<h3 class="font-medium text-ink">Naruszenia przestrzeni powietrznej</h3>
-						<p class="mt-1 text-sm text-ink-muted">Komunikaty DORSZ o potwierdzonych naruszeniach</p>
+						<p class="mt-1 text-sm text-ink-muted">
+							Komunikaty DORSZ o potwierdzonych naruszeniach
+						</p>
 					</div>
 					<div class="text-sm text-ink-muted">Wkrótce</div>
 				</div>

@@ -1,16 +1,14 @@
 <script lang="ts">
-	let { 
+	import type { MapLayers } from '$lib/types';
+
+	let {
 		activeLayers = $bindable({
-			epR134: true,
-			borderPoints: true,
-			events: true
+			alertAreas: true,
+			uaOblasts: true,
+			borderPoints: true
 		})
 	}: {
-		activeLayers: {
-			epR134: boolean;
-			borderPoints: boolean;
-			events: boolean;
-		};
+		activeLayers: MapLayers;
 	} = $props();
 
 	let expanded = $state(false);
@@ -20,9 +18,9 @@
 	}
 
 	const layers = [
-		{ key: 'epR134' as const, label: 'Strefa EP R134', icon: '🟨' },
-		{ key: 'events' as const, label: 'Wydarzenia', icon: '⚡' },
-		{ key: 'borderPoints' as const, label: 'Granica / kontekst', icon: '📍' }
+		{ key: 'alertAreas' as const, label: 'Obszary alertu RCB', icon: '🟧' },
+		{ key: 'uaOblasts' as const, label: 'Alarmy w zach. Ukrainie', icon: '🟥' },
+		{ key: 'borderPoints' as const, label: 'Przejścia graniczne', icon: '📍' }
 	];
 </script>
 
@@ -37,7 +35,12 @@
 					aria-label="Zwiń warstwy"
 				>
 					<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M6 18L18 6M6 6l12 12"
+						/>
 					</svg>
 				</button>
 			</div>
@@ -56,7 +59,8 @@
 			</div>
 			<div class="mt-3 border-t border-border pt-2">
 				<p class="text-xs text-ink-muted">
-					Tylko kontekst oficjalnych komunikatów — bez śledzenia wojsk.
+					Zaznaczamy wyłącznie obszary wskazane w oficjalnych komunikatach. Bez śledzenia wojsk i
+					bez zgadywania.
 				</p>
 			</div>
 		</div>

@@ -1,8 +1,9 @@
-import type { PageLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 
-export const load: PageLoad = async ({ parent }) => {
-	const parentData = await parent();
-	return {
-		status: parentData.status || null
-	};
+/**
+ * The map is the home page. /map stayed behind as a second, diverging copy of
+ * it, so it now redirects instead of being maintained twice.
+ */
+export const load = () => {
+	redirect(308, '/');
 };

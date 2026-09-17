@@ -1,5 +1,6 @@
 import { action } from './_generated/server';
 import { api } from './_generated/api';
+import { USER_AGENT } from './lib/http.ts';
 
 interface RssFeed {
 	key: string;
@@ -114,7 +115,7 @@ async function pollSingleFeed(ctx: any, feed: RssFeed): Promise<number> {
 
 	const response = await fetch(feed.url, {
 		headers: {
-			'User-Agent': 'GranicaAlertBot/0.1 (civic air awareness; contact: dev@example.com)'
+			'User-Agent': USER_AGENT
 		}
 	});
 
@@ -207,7 +208,10 @@ function extractTag(xml: string, tagName: string): string | null {
 }
 
 function stripTags(html: string): string {
-	return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+	return html
+		.replace(/<[^>]*>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 function decodeHtml(text: string): string {

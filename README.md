@@ -21,7 +21,92 @@ A SvelteKit + Convex application that aggregates official air situation alerts (
 - **Frontend**: SvelteKit + TailwindCSS
 - **Backend/DB**: Convex (reactive database + serverless functions)
 - **Scheduled polling**: Convex cron jobs
-- **Map** (future): MapLibre GL
+- **Map**: MapLibre GL with bundled administrative boundaries
+
+## What the map shows
+
+The map shades only the areas an official communication actually names. RCB
+states the scope of an alert in its own text ("Alert RCB został wysłany do
+odbiorców na terenie woj. podkarpackiego i lubelskiego"), and that sentence is
+what drives the shading. An alert whose scope cannot be read shades nothing
+rather than shading a guess, and a powiat-scoped alert shades that powiat rather
+than its whole voivodeship.
+
+Western Ukrainian oblasts under air-raid alarm are drawn separately, with a
+whole-oblast alarm distinguished from a partial one. An alarm across the border
+is context, not a threat to Polish territory, and is labelled as such.
+
+Nothing on the map is a position, a track, or a sighting.
+
+### Data sources and attribution
+
+| Layer                           | Source                                                                                                    | Licence                 |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------- | ----------------------- |
+| Base map tiles                  | OpenStreetMap                                                                                             | ODbL                    |
+| Voivodeship / powiat boundaries | GUGiK Państwowy Rejestr Granic, via [ppatrzyk/polska-geojson](https://github.com/ppatrzyk/polska-geojson) | public data             |
+| Ukrainian oblast boundaries     | [geoBoundaries](https://www.geoboundaries.org/) gbOpen UKR ADM1 (OSM-derived)                             | ODbL                    |
+| RCB komunikaty                  | [gov.pl/web/rcb/komunikaty](https://www.gov.pl/web/rcb/komunikaty)                                        | official communications |
+| Ukrainian air-raid alarms       | [alerts.in.ua](https://alerts.in.ua/) API (token required)                                                | per their terms         |
+
+Regenerate the bundled boundary data with `npm run gen:data`.
+
+### What the app will and will not claim
+
+RCB publishes a date but no time of day, and no end time. It announces a
+stand-down by editing the same komunikat, and does not do so for every alert. So
+the status is one of four states, and only one of them is an all-clear:
+
+| State             | Meaning                                                    |
+| ----------------- | ---------------------------------------------------------- |
+| `active`          | Issued recently and RCB has not called it off              |
+| `cancelled`       | RCB published a stand-down — the only all-clear we assert  |
+| `no_confirmation` | Past our display window with no stand-down: we do not know |
+| `none`            | Nothing recent enough to show                              |
+
+Two guards keep this from drifting into false confidence:
+
+- A komunikat is timestamped with the moment we saw it **only** if we were
+  polling continuously when it appeared. After a gap — a first run, an outage — a
+  komunikat could have been published hours earlier, so it keeps date precision
+  and can never be reported as in force. Without this, a catch-up poll would
+  light up the map for a threat that was already over.
+- If the RCB poller is failing or has fallen behind, the app says it has no data
+  rather than reporting quiet. Silence from a broken scraper is not an all-clear.
+
+Both rules are covered by tests in `tests/airState.test.ts` and
+`tests/sourceHealth.test.ts`.
+
+### Polling etiquette
+
+RCB is polled every 5 minutes, but a poll is cheap. The listing is revalidated
+with `If-None-Match`, so an unchanged listing costs one empty 304, and stored
+komunikaty are re-read on a tapering schedule (`convex/lib/refreshSchedule.ts`):
+every poll while a komunikat is under 2h old — the window in which RCB appends
+the line naming which voivodeships an alert went to — then every 30 minutes, then
+only if we still have no area for it, then not at all past 48 hours. Those
+re-reads are conditional too.
+
+This matters: without the taper the poller re-read every komunikat in the window
+on every poll, roughly 2,600 requests a day to gov.pl for content that had not
+changed. Steady state is now a few hundred, nearly all of them empty 304s.
+
+alerts.in.ua is polled every 30s against a documented ceiling of 30 requests per
+10 minutes (1 per 20s), leaving headroom for a retry.
+
+### Configuration
+
+Set on the **Convex deployment**, not in `.env.local` — the pollers run inside
+Convex and never see Vite's environment:
+
+```bash
+npx convex env set ALERTS_IN_UA_TOKEN <token>
+npx convex env set BOT_CONTACT_EMAIL kontakt@piotrgorczyca.com
+```
+
+`BOT_CONTACT_EMAIL` goes into the User-Agent sent to gov.pl, alerts.in.ua and
+every news feed polled, so those sites can reach the operator instead of simply
+blocking the bot. Use a real, monitored address — if it is unset the User-Agent
+says so rather than naming one that bounces.
 
 ## Setup
 
@@ -306,8 +391,8 @@ Then visit `http://localhost:3000`
 
 ### Phase 2
 
-- MapLibre integration with EP R134 zone
-- Static incident pins (Tarnawa, etc.)
+- Restricted-zone (EP R) polygons, once sourced from the PANSA AIP rather than drawn by hand
+- Border crossing operating status from Straż Graniczna
 - Optional OpenSky civil traffic layer
 - Multi-language support (EN)
 - PWA manifest for mobile install
